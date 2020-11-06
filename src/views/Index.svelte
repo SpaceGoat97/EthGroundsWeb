@@ -29,15 +29,6 @@
         </h2>
         <p class="mt-4 text-lg leading-relaxed text-gray-600">
           Blockchain powered creativity. EthGrounds helps you break through glass ceilings by allowing you to create and fund your own on-chain company. Create community funded movies, music albums, animation, paintings or any other creative project with ease.
-          <a
-            href="https://tailwindcss.com/?ref=creativetim"
-            class="text-gray-700"
-            target="_blank"
-          >
-            Tailwind CSS
-          </a>
-          . It features multiple HTML elements and it comes with dynamic
-          components for ReactJS, Vue and Angular.
         </p>
         <div class="mt-12">
           <a
