@@ -25,11 +25,10 @@
     <div class="w-full md:w-8/12 lg:w-6/12 xl:w-6/12 px-4">
       <div class="pt-32 sm:pt-0">
         <h2 class="font-semibold text-4xl text-gray-700">
-          Notus Svelte - A beautiful extension for Tailwind CSS.
+          A place to fund your Ethereum projects
         </h2>
         <p class="mt-4 text-lg leading-relaxed text-gray-600">
-          Notus Svelte is Free and Open Source. It does not change or
-          add any CSS to the already one from
+          Blockchain powered creativity. EthGrounds helps you break through glass ceilings by allowing you to create and fund your own on-chain company. Create community funded movies, music albums, animation, paintings or any other creative project with ease.
           <a
             href="https://tailwindcss.com/?ref=creativetim"
             class="text-gray-700"
