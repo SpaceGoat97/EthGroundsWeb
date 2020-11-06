@@ -25,7 +25,7 @@
         class="text-gray-800 text-sm font-bold leading-relaxed inline-block mr-4 py-2 whitespace-no-wrap uppercase"
         href="/"
       >
-        Notus Svelte
+        EthGrounds
       </a>
       <button
         class="cursor-pointer text-xl leading-none px-3 py-1 border border-solid border-transparent rounded bg-transparent block lg:hidden outline-none focus:outline-none"
@@ -39,20 +39,14 @@
       class="lg:flex flex-grow items-center {navbarOpen ? 'block':'hidden'}"
       id="example-navbar-warning"
     >
-      <ul class="flex flex-col lg:flex-row list-none mr-auto">
+      <ul class="flex flex-col lg:flex-row list-none lg:ml-auto">
         <li class="flex items-center">
           <a
             class="hover:text-gray-600 text-gray-800 px-3 py-2 flex items-center text-xs uppercase font-bold"
-            href="https://www.creative-tim.com/learning-lab/tailwind/svelte/overview/notus?ref=ns-index-navbar"
+            href="#pablo"
           >
-            <i class="text-gray-500 far fa-file-alt text-lg leading-lg mr-2" />
-            Docs
+            About
           </a>
-        </li>
-      </ul>
-      <ul class="flex flex-col lg:flex-row list-none lg:ml-auto">
-        <li class="flex items-center">
-          <IndexDropdown />
         </li>
         <li class="flex items-center">
           <a
@@ -92,7 +86,7 @@
             class="bg-red-500 text-white active:bg-red-600 text-xs font-bold uppercase px-4 py-2 rounded shadow hover:shadow-lg outline-none focus:outline-none lg:mr-1 lg:mb-0 ml-3 mb-3 ease-linear transition-all duration-150"
             type="button"
           >
-            <i class="fas fa-arrow-alt-circle-down"></i> Download
+            <i class="fas fa-arrow-alt-circle-down"></i> Log In with Metamask
           </button>
         </li>
       </ul>
