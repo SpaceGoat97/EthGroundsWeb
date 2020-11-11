@@ -24,10 +24,12 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.14.0",
+    "@maticnetwork/walletconnect-provider": "0.0.1-beta.1",
     "@popperjs/core": "2.5.1",
     "@rollup/plugin-alias": "3.1.1",
     "@tailwindcss/custom-forms": "0.2.1",
     "chart.js": "2.9.3",
+    "maticjs": "^1.0.1",
     "sirv-cli": "1.0.6",
     "svelte-routing": "1.4.2",
     "tailwindcss": "1.8.10"
