@@ -1,87 +1,14 @@
 <script>
   import { link } from "svelte-routing";
-  import WalletConnectProvider from "@maticnetwork/walletconnect-provider"
-  import Web3 from "web3"
-  import Matic from "maticjs"
 
   // core components
   import IndexDropdown from "components/Dropdowns/IndexDropdown.svelte";
 
   let navbarOpen = false;
 
-  let myContractAbi = [
-	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "initMessage",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"constant": false,
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "newMessage",
-				"type": "string"
-			}
-		],
-		"name": "update",
-		"outputs": [],
-		"payable": false,
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"constant": true,
-		"inputs": [],
-		"name": "message",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"payable": false,
-		"stateMutability": "view",
-		"type": "function"
-	}
-];
-
-let myContractAddress = 0xCBd2a0814ffac11f8C1a9db9Cad8BF4B5d3B82fD;
-
   function setNavbarOpen() {
     navbarOpen = !navbarOpen;
   }
-
-  const maticProvider = new WalletConnectProvider(
-  {
-    host: `https://rpc-mumbai.matic.today`,
-    callbacks: {
-      onConnect: console.log('connected'),
-      onDisconnect: console.log('disconnected!')
-    }
-  }
-)
-
-const ropstenProvider = new WalletConnectProvider({
-  host: `https://ropsten.infura.io/v3/70645f042c3a409599c60f96f6dd9fbc`,
-  callbacks: {
-    onConnect: console.log('connected'),
-    onDisconnect: console.log('disconnected')
-  }
-})
-
-const maticWeb3 = new Web3(maticProvider)
-const ropstenWeb3 = new Web3(ropstenProvider)
-
-const myContractInstance = new this.maticWeb3.eth.Contract(myContractAbi, myContractAddress)
 </script>
 
 <nav
@@ -98,7 +25,7 @@ const myContractInstance = new this.maticWeb3.eth.Contract(myContractAbi, myCont
         class="text-gray-800 text-sm font-bold leading-relaxed inline-block mr-4 py-2 whitespace-no-wrap uppercase"
         href="/"
       >
-        EthGrounds
+        Notus Svelte
       </a>
       <button
         class="cursor-pointer text-xl leading-none px-3 py-1 border border-solid border-transparent rounded bg-transparent block lg:hidden outline-none focus:outline-none"
@@ -112,7 +39,21 @@ const myContractInstance = new this.maticWeb3.eth.Contract(myContractAbi, myCont
       class="lg:flex flex-grow items-center {navbarOpen ? 'block':'hidden'}"
       id="example-navbar-warning"
     >
+      <ul class="flex flex-col lg:flex-row list-none mr-auto">
+        <li class="flex items-center">
+          <a
+            class="hover:text-gray-600 text-gray-800 px-3 py-2 flex items-center text-xs uppercase font-bold"
+            href="https://www.creative-tim.com/learning-lab/tailwind/svelte/overview/notus?ref=ns-index-navbar"
+          >
+            <i class="text-gray-500 far fa-file-alt text-lg leading-lg mr-2" />
+            Docs
+          </a>
+        </li>
+      </ul>
       <ul class="flex flex-col lg:flex-row list-none lg:ml-auto">
+        <li class="flex items-center">
+          <IndexDropdown />
+        </li>
         <li class="flex items-center">
           <a
             class="hover:text-gray-600 text-gray-800 px-3 py-2 flex items-center text-xs uppercase font-bold"
@@ -150,9 +91,8 @@ const myContractInstance = new this.maticWeb3.eth.Contract(myContractAbi, myCont
           <button
             class="bg-red-500 text-white active:bg-red-600 text-xs font-bold uppercase px-4 py-2 rounded shadow hover:shadow-lg outline-none focus:outline-none lg:mr-1 lg:mb-0 ml-3 mb-3 ease-linear transition-all duration-150"
             type="button"
-            onclick=""
           >
-            <i class="fas fa-arrow-alt-circle-down"></i> Log In with Metamask
+            <i class="fas fa-arrow-alt-circle-down"></i> Download
           </button>
         </li>
       </ul>
