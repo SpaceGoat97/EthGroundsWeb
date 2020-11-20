@@ -1,5 +1,5 @@
 
-(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35730/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 var app = (function () {
     'use strict';
 
@@ -22428,7 +22428,7 @@ var app = (function () {
     			h2.textContent = "Hello Tailwind!";
     			t2 = space();
     			p = element("p");
-    			p.textContent = "Learning Tailwind is incredibly easy. The team has done a wonderful job with the documentation. This is pretty amazing, I must say.";
+    			p.textContent = "Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.";
     			t4 = space();
     			button = element("button");
     			button.textContent = "Hey, click me.";
@@ -22440,7 +22440,7 @@ var app = (function () {
     			attr_dev(p, "class", "mb-4 text-grey-dark text-sm");
     			add_location(p, file, 26, 6, 817);
     			attr_dev(button, "class", "py-3 px-6 bg-purple hover:bg-purple-light text-white font-bold rounded-full mt-1 mb-2 svelte-1pbhhlx");
-    			add_location(button, file, 31, 6, 1045);
+    			add_location(button, file, 31, 6, 1049);
     			attr_dev(div1, "class", "px-6 py-4");
     			add_location(div1, file, 24, 5, 732);
     			attr_dev(div2, "class", "max-w-lg shadow-lg rounded overflow-hidden m-4 sm:flex");
