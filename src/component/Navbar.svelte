@@ -11,13 +11,13 @@
 <!-- This is an example component -->
 <div class="flex flex-wrap">
   <!-- Sidebar -->
-      <nav class="flex flex-col items-center bg-purple-700 xl:w-1/12  h-full justify-between py-10 fixed w-20"> 
+      <nav class="flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20"> 
         <!-- Profile photo-->
           
           <a href="#">
             <img
               src={photoURL}
-              class="rounded-full w-14 h-12 mb-3 mx-auto"
+              class="rounded-full w-14 h-12"
             />
           </a>
           <div>
@@ -53,7 +53,7 @@
           </a>
         </div>
       </nav>
-      <main class=" relative md:ml-64 bg-gray-200 xl:w-11/12 leading-snug ">
+      <main class=" relative ml-20 bg-gray-200 leading-snug ">
         <div class=" text-gray-700 relative flex flex-col">
         <div class=" items-center flex justify-between flex-wrap px-4">
           <div class=" flex flex-col bg-white">
