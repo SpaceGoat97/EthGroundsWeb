@@ -22414,8 +22414,6 @@ var app = (function () {
     	let h2;
     	let t2;
     	let p;
-    	let t4;
-    	let button;
 
     	const block = {
     		c: function create() {
@@ -22429,23 +22427,18 @@ var app = (function () {
     			t2 = space();
     			p = element("p");
     			p.textContent = "Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.";
-    			t4 = space();
-    			button = element("button");
-    			button.textContent = "Hey, click me.";
-    			attr_dev(div0, "class", "h-48 sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden");
+    			attr_dev(div0, "class", "h-124 sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden");
     			set_style(div0, "background-image", "url('https://unsplash.it/804/800')");
-    			add_location(div0, file, 20, 4, 480);
+    			add_location(div0, file, 20, 4, 486);
     			attr_dev(h2, "class", "mb-2 font-black");
-    			add_location(h2, file, 25, 6, 762);
+    			add_location(h2, file, 25, 6, 769);
     			attr_dev(p, "class", "mb-4 text-grey-dark text-sm");
-    			add_location(p, file, 26, 6, 817);
-    			attr_dev(button, "class", "py-3 px-6 bg-purple hover:bg-purple-light text-white font-bold rounded-full mt-1 mb-2 svelte-1pbhhlx");
-    			add_location(button, file, 31, 6, 1049);
+    			add_location(p, file, 26, 6, 824);
     			attr_dev(div1, "class", "px-6 py-4");
-    			add_location(div1, file, 24, 5, 732);
-    			attr_dev(div2, "class", "max-w-lg shadow-lg rounded overflow-hidden m-4 sm:flex");
-    			add_location(div2, file, 19, 2, 407);
-    			attr_dev(section, "class", "m-2 font-sans leading-normal flex");
+    			add_location(div1, file, 24, 5, 739);
+    			attr_dev(div2, "class", "w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex");
+    			add_location(div2, file, 19, 2, 408);
+    			attr_dev(section, "class", "mb-2 font-sans leading-normal flex");
     			add_location(section, file, 16, 0, 326);
     		},
     		l: function claim(nodes) {
@@ -22460,8 +22453,6 @@ var app = (function () {
     			append_dev(div1, h2);
     			append_dev(div1, t2);
     			append_dev(div1, p);
-    			append_dev(div1, t4);
-    			append_dev(div1, button);
     		},
     		p: noop,
     		i: noop,
@@ -22512,7 +22503,7 @@ var app = (function () {
     const file$1 = "src/component/Navbar.svelte";
 
     function create_fragment$3(ctx) {
-    	let div6;
+    	let div5;
     	let nav;
     	let a0;
     	let img0;
@@ -22587,9 +22578,9 @@ var app = (function () {
     	let path36;
     	let t4;
     	let main;
-    	let div5;
     	let div4;
     	let div3;
+    	let div2;
     	let a5;
     	let img1;
     	let img1_src_value;
@@ -22600,12 +22591,10 @@ var app = (function () {
     	let t6;
     	let h1;
     	let t8;
-    	let div2;
-    	let t9;
     	let dashcard0;
-    	let t10;
+    	let t9;
     	let dashcard1;
-    	let t11;
+    	let t10;
     	let dashcard2;
     	let current;
     	let mounted;
@@ -22616,7 +22605,7 @@ var app = (function () {
 
     	const block = {
     		c: function create() {
-    			div6 = element("div");
+    			div5 = element("div");
     			nav = element("nav");
     			a0 = element("a");
     			img0 = element("img");
@@ -22690,9 +22679,9 @@ var app = (function () {
     			path36 = svg_element("path");
     			t4 = space();
     			main = element("main");
-    			div5 = element("div");
     			div4 = element("div");
     			div3 = element("div");
+    			div2 = element("div");
     			a5 = element("a");
     			img1 = element("img");
     			t5 = space();
@@ -22702,12 +22691,10 @@ var app = (function () {
     			h1 = element("h1");
     			h1.textContent = "Featured Projects";
     			t8 = space();
-    			div2 = element("div");
-    			t9 = space();
     			create_component(dashcard0.$$.fragment);
-    			t10 = space();
+    			t9 = space();
     			create_component(dashcard1.$$.fragment);
-    			t11 = space();
+    			t10 = space();
     			create_component(dashcard2.$$.fragment);
     			if (img0.src !== (img0_src_value = /*photoURL*/ ctx[0])) attr_dev(img0, "src", img0_src_value);
     			attr_dev(img0, "class", "rounded-full w-14 h-12");
@@ -22894,27 +22881,25 @@ var app = (function () {
     			if (img2.src !== (img2_src_value = "https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124")) attr_dev(img2, "src", img2_src_value);
     			add_location(img2, file$1, 60, 20, 12920);
     			add_location(a6, file$1, 60, 16, 12916);
-    			attr_dev(h1, "class", "mx-5 my-10 font-sans text-gray-600 text-4xl ddivide-y-4 divide-yellow-600 divide-dashed");
+    			attr_dev(h1, "class", "mx-12 my-10 font-sans text-gray-700 text-4xl");
     			add_location(h1, file$1, 62, 16, 13091);
-    			attr_dev(div2, "class", " ");
-    			add_location(div2, file$1, 63, 16, 13230);
-    			attr_dev(div3, "class", " flex-1 flex-col bg-white");
-    			add_location(div3, file$1, 58, 12, 12732);
-    			attr_dev(div4, "class", " items-center flex justify-between flex-wrap");
-    			add_location(div4, file$1, 57, 10, 12661);
-    			attr_dev(div5, "class", " text-gray-700 relative flex flex-col");
-    			add_location(div5, file$1, 56, 8, 12599);
+    			attr_dev(div2, "class", " flex-1 flex-col bg-white");
+    			add_location(div2, file$1, 58, 12, 12732);
+    			attr_dev(div3, "class", " items-center flex justify-between flex-wrap");
+    			add_location(div3, file$1, 57, 10, 12661);
+    			attr_dev(div4, "class", " text-gray-700 relative flex flex-col");
+    			add_location(div4, file$1, 56, 8, 12599);
     			attr_dev(main, "class", " relative ml-20 bg-gray-200 leading-snug w-full");
     			add_location(main, file$1, 55, 6, 12528);
-    			attr_dev(div6, "class", "flex flex-wrap");
-    			add_location(div6, file$1, 11, 0, 186);
+    			attr_dev(div5, "class", "flex flex-wrap");
+    			add_location(div5, file$1, 11, 0, 186);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div6, anchor);
-    			append_dev(div6, nav);
+    			insert_dev(target, div5, anchor);
+    			append_dev(div5, nav);
     			append_dev(nav, a0);
     			append_dev(a0, img0);
     			append_dev(nav, t0);
@@ -22985,26 +22970,24 @@ var app = (function () {
     			append_dev(g7, path34);
     			append_dev(g7, path35);
     			append_dev(g7, path36);
-    			append_dev(div6, t4);
-    			append_dev(div6, main);
-    			append_dev(main, div5);
-    			append_dev(div5, div4);
+    			append_dev(div5, t4);
+    			append_dev(div5, main);
+    			append_dev(main, div4);
     			append_dev(div4, div3);
-    			append_dev(div3, a5);
-    			append_dev(a5, img1);
-    			append_dev(div3, t5);
-    			append_dev(div3, a6);
-    			append_dev(a6, img2);
-    			append_dev(div3, t6);
-    			append_dev(div3, h1);
-    			append_dev(div3, t8);
     			append_dev(div3, div2);
-    			append_dev(div3, t9);
-    			mount_component(dashcard0, div3, null);
-    			append_dev(div3, t10);
-    			mount_component(dashcard1, div3, null);
-    			append_dev(div3, t11);
-    			mount_component(dashcard2, div3, null);
+    			append_dev(div2, a5);
+    			append_dev(a5, img1);
+    			append_dev(div2, t5);
+    			append_dev(div2, a6);
+    			append_dev(a6, img2);
+    			append_dev(div2, t6);
+    			append_dev(div2, h1);
+    			append_dev(div2, t8);
+    			mount_component(dashcard0, div2, null);
+    			append_dev(div2, t9);
+    			mount_component(dashcard1, div2, null);
+    			append_dev(div2, t10);
+    			mount_component(dashcard2, div2, null);
     			current = true;
 
     			if (!mounted) {
@@ -23031,7 +23014,7 @@ var app = (function () {
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div6);
+    			if (detaching) detach_dev(div5);
     			destroy_component(dashcard0);
     			destroy_component(dashcard1);
     			destroy_component(dashcard2);
