@@ -12,9 +12,7 @@
 <!-- This is an example component -->
 <div class="flex flex-wrap">
   <!-- Sidebar -->
-      <nav class="flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20"> 
-        <!-- Profile photo-->
-          
+      <nav class="flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20">
           <a href="#">
             <img
               src={photoURL}
@@ -23,13 +21,6 @@
           </a>
           <div>
           <ul>
-            <li class="mb-6">
-              <a href="#">
-                <span>
-                  
-                </span>
-              </a>
-            </li>
             <li class="rounded-full h-12 mb-3">
               <a href="#" >
                 <span>
@@ -58,8 +49,7 @@
         <div class=" text-gray-700 relative flex flex-col">
           <div class=" items-center flex justify-between flex-wrap">
             <div class=" flex-1 flex-col bg-white">
-                <a><img class="" style="width:15%" src="https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif"/></a>
-                <a ><img class="mx-auto" style="width:50%" src="https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124"/></a>
+                <a ><img class="w-full" style="width:100%" src="https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124"/></a>
                 <!--Content-->
                 <h1 class="mx-12 my-10 font-sans text-gray-700 text-4xl">Featured Projects</h1>
                 <Dashcard />

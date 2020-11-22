@@ -13,13 +13,17 @@
 <!-- wrapper -->
 <section class="mb-2 font-sans leading-normal flex">
   <!-- card container -->
-  <div class="w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex">
-    <div class="h-124 sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden" style="background-image: url('https://unsplash.it/804/800')">
+  <div class="w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex ">
+    <div class="h-full sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden" style="background-image: url('https://unsplash.it/804/800')">
     </div>
     <!-- card-content -->
-     <div class="px-6 py-4">
+     <div class="px-6 py-20">
       <h2 class="mb-2 font-black">Hello Tailwind!</h2>
       <p class="mb-4 text-grey-dark text-sm">
+        
+        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
+        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
+        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
         Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
        </p>
     </div>
