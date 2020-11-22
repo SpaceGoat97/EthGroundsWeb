@@ -1,5 +1,5 @@
 
-(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35730/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 var app = (function () {
     'use strict';
 
@@ -22512,7 +22512,7 @@ var app = (function () {
     const file$1 = "src/component/Navbar.svelte";
 
     function create_fragment$3(ctx) {
-    	let div5;
+    	let div6;
     	let nav;
     	let a0;
     	let img0;
@@ -22587,9 +22587,9 @@ var app = (function () {
     	let path36;
     	let t4;
     	let main;
+    	let div5;
     	let div4;
     	let div3;
-    	let div2;
     	let a5;
     	let img1;
     	let img1_src_value;
@@ -22598,10 +22598,14 @@ var app = (function () {
     	let img2;
     	let img2_src_value;
     	let t6;
-    	let dashcard0;
-    	let t7;
-    	let dashcard1;
+    	let h1;
     	let t8;
+    	let div2;
+    	let t9;
+    	let dashcard0;
+    	let t10;
+    	let dashcard1;
+    	let t11;
     	let dashcard2;
     	let current;
     	let mounted;
@@ -22612,7 +22616,7 @@ var app = (function () {
 
     	const block = {
     		c: function create() {
-    			div5 = element("div");
+    			div6 = element("div");
     			nav = element("nav");
     			a0 = element("a");
     			img0 = element("img");
@@ -22686,19 +22690,24 @@ var app = (function () {
     			path36 = svg_element("path");
     			t4 = space();
     			main = element("main");
+    			div5 = element("div");
     			div4 = element("div");
     			div3 = element("div");
-    			div2 = element("div");
     			a5 = element("a");
     			img1 = element("img");
     			t5 = space();
     			a6 = element("a");
     			img2 = element("img");
     			t6 = space();
-    			create_component(dashcard0.$$.fragment);
-    			t7 = space();
-    			create_component(dashcard1.$$.fragment);
+    			h1 = element("h1");
+    			h1.textContent = "Featured Projects";
     			t8 = space();
+    			div2 = element("div");
+    			t9 = space();
+    			create_component(dashcard0.$$.fragment);
+    			t10 = space();
+    			create_component(dashcard1.$$.fragment);
+    			t11 = space();
     			create_component(dashcard2.$$.fragment);
     			if (img0.src !== (img0_src_value = /*photoURL*/ ctx[0])) attr_dev(img0, "src", img0_src_value);
     			attr_dev(img0, "class", "rounded-full w-14 h-12");
@@ -22876,7 +22885,7 @@ var app = (function () {
     			attr_dev(nav, "class", "flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20");
     			add_location(nav, file$1, 13, 6, 240);
     			attr_dev(img1, "class", "");
-    			set_style(img1, "width", "20%");
+    			set_style(img1, "width", "15%");
     			if (img1.src !== (img1_src_value = "https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif")) attr_dev(img1, "src", img1_src_value);
     			add_location(img1, file$1, 59, 19, 12791);
     			add_location(a5, file$1, 59, 16, 12788);
@@ -22885,23 +22894,27 @@ var app = (function () {
     			if (img2.src !== (img2_src_value = "https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124")) attr_dev(img2, "src", img2_src_value);
     			add_location(img2, file$1, 60, 20, 12920);
     			add_location(a6, file$1, 60, 16, 12916);
-    			attr_dev(div2, "class", " flex-1 flex-col bg-white");
-    			add_location(div2, file$1, 58, 12, 12732);
-    			attr_dev(div3, "class", " items-center flex justify-between flex-wrap");
-    			add_location(div3, file$1, 57, 10, 12661);
-    			attr_dev(div4, "class", " text-gray-700 relative flex flex-col");
-    			add_location(div4, file$1, 56, 8, 12599);
+    			attr_dev(h1, "class", "mx-5 my-10 font-sans text-gray-600 text-4xl ddivide-y-4 divide-yellow-600 divide-dashed");
+    			add_location(h1, file$1, 62, 16, 13091);
+    			attr_dev(div2, "class", " ");
+    			add_location(div2, file$1, 63, 16, 13230);
+    			attr_dev(div3, "class", " flex-1 flex-col bg-white");
+    			add_location(div3, file$1, 58, 12, 12732);
+    			attr_dev(div4, "class", " items-center flex justify-between flex-wrap");
+    			add_location(div4, file$1, 57, 10, 12661);
+    			attr_dev(div5, "class", " text-gray-700 relative flex flex-col");
+    			add_location(div5, file$1, 56, 8, 12599);
     			attr_dev(main, "class", " relative ml-20 bg-gray-200 leading-snug w-full");
     			add_location(main, file$1, 55, 6, 12528);
-    			attr_dev(div5, "class", "flex flex-wrap");
-    			add_location(div5, file$1, 11, 0, 186);
+    			attr_dev(div6, "class", "flex flex-wrap");
+    			add_location(div6, file$1, 11, 0, 186);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div5, anchor);
-    			append_dev(div5, nav);
+    			insert_dev(target, div6, anchor);
+    			append_dev(div6, nav);
     			append_dev(nav, a0);
     			append_dev(a0, img0);
     			append_dev(nav, t0);
@@ -22972,22 +22985,26 @@ var app = (function () {
     			append_dev(g7, path34);
     			append_dev(g7, path35);
     			append_dev(g7, path36);
-    			append_dev(div5, t4);
-    			append_dev(div5, main);
-    			append_dev(main, div4);
+    			append_dev(div6, t4);
+    			append_dev(div6, main);
+    			append_dev(main, div5);
+    			append_dev(div5, div4);
     			append_dev(div4, div3);
-    			append_dev(div3, div2);
-    			append_dev(div2, a5);
+    			append_dev(div3, a5);
     			append_dev(a5, img1);
-    			append_dev(div2, t5);
-    			append_dev(div2, a6);
+    			append_dev(div3, t5);
+    			append_dev(div3, a6);
     			append_dev(a6, img2);
-    			append_dev(div2, t6);
-    			mount_component(dashcard0, div2, null);
-    			append_dev(div2, t7);
-    			mount_component(dashcard1, div2, null);
-    			append_dev(div2, t8);
-    			mount_component(dashcard2, div2, null);
+    			append_dev(div3, t6);
+    			append_dev(div3, h1);
+    			append_dev(div3, t8);
+    			append_dev(div3, div2);
+    			append_dev(div3, t9);
+    			mount_component(dashcard0, div3, null);
+    			append_dev(div3, t10);
+    			mount_component(dashcard1, div3, null);
+    			append_dev(div3, t11);
+    			mount_component(dashcard2, div3, null);
     			current = true;
 
     			if (!mounted) {
@@ -23014,7 +23031,7 @@ var app = (function () {
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div5);
+    			if (detaching) detach_dev(div6);
     			destroy_component(dashcard0);
     			destroy_component(dashcard1);
     			destroy_component(dashcard2);
@@ -23751,6 +23768,8 @@ var app = (function () {
     	let path13;
     	let path14;
     	let t5;
+    	let t6;
+    	let t7;
     	let mounted;
     	let dispose;
 
@@ -23790,76 +23809,78 @@ var app = (function () {
     			path13 = svg_element("path");
     			path14 = svg_element("path");
     			t5 = text(" Sign in with Google");
+    			t6 = text("\n    ````");
+    			t7 = text("\n````");
     			attr_dev(span, "class", "text-indigo-600");
-    			add_location(span, file$2, 22, 55, 570);
+    			add_location(span, file$2, 22, 62, 582);
     			attr_dev(h10, "class", "text-4xl text-center mb-12 font-thins");
-    			add_location(h10, file$2, 22, 5, 520);
+    			add_location(h10, file$2, 22, 12, 532);
     			attr_dev(h11, "class", "mb-6 font-thins");
-    			add_location(h11, file$2, 25, 28, 743);
+    			add_location(h11, file$2, 25, 20, 764);
     			attr_dev(path0, "fill", "#c7ede6");
     			attr_dev(path0, "d", "M87.215,56.71C88.35,54.555,89,52.105,89,49.5c0-6.621-4.159-12.257-10.001-14.478 C78.999,35.015,79,35.008,79,35c0-11.598-9.402-21-21-21c-9.784,0-17.981,6.701-20.313,15.757C36.211,29.272,34.638,29,33,29 c-7.692,0-14.023,5.793-14.89,13.252C12.906,43.353,9,47.969,9,53.5C9,59.851,14.149,65,20.5,65c0.177,0,0.352-0.012,0.526-0.022 C21.022,65.153,21,65.324,21,65.5C21,76.822,30.178,86,41.5,86c6.437,0,12.175-2.972,15.934-7.614C59.612,80.611,62.64,82,66,82 c4.65,0,8.674-2.65,10.666-6.518C77.718,75.817,78.837,76,80,76c6.075,0,11-4.925,11-11C91,61.689,89.53,58.727,87.215,56.71z");
-    			add_location(path0, file$2, 26, 228, 1017);
+    			add_location(path0, file$2, 26, 241, 1051);
     			attr_dev(path1, "fill", "#fdfcef");
     			attr_dev(path1, "d", "M78.5,71.5V72h3v-0.5c0,0,4.242,0,5.5,0c2.485,0,4.5-2.015,4.5-4.5 c0-2.333-1.782-4.229-4.055-4.455C87.467,62.364,87.5,62.187,87.5,62c0-2.485-2.015-4.5-4.5-4.5c-1.438,0-2.703,0.686-3.527,1.736 C79.333,56.6,77.171,54.5,74.5,54.5c-2.761,0-5,2.239-5,5c0,0.446,0.077,0.87,0.187,1.282C69.045,60.005,68.086,59.5,67,59.5 c-1.781,0-3.234,1.335-3.455,3.055C63.364,62.533,63.187,62.5,63,62.5c-2.485,0-4.5,2.015-4.5,4.5s2.015,4.5,4.5,4.5s9.5,0,9.5,0 H78.5z");
-    			add_location(path1, file$2, 26, 826, 1615);
+    			add_location(path1, file$2, 26, 839, 1649);
     			attr_dev(path2, "fill", "#472b29");
     			attr_dev(path2, "d", "M74.5,54c-3.033,0-5.5,2.467-5.5,5.5c0,0.016,0,0.031,0,0.047C68.398,59.192,67.71,59,67,59 c-1.831,0-3.411,1.261-3.858,3.005C63.095,62.002,63.048,62,63,62c-2.757,0-5,2.243-5,5s2.243,5,5,5h15.5 c0.276,0,0.5-0.224,0.5-0.5S78.776,71,78.5,71H63c-2.206,0-4-1.794-4-4s1.794-4,4-4c0.117,0,0.23,0.017,0.343,0.032l0.141,0.019 c0.021,0.003,0.041,0.004,0.062,0.004c0.246,0,0.462-0.185,0.495-0.437C64.232,61.125,65.504,60,67,60 c0.885,0,1.723,0.401,2.301,1.1c0.098,0.118,0.241,0.182,0.386,0.182c0.078,0,0.156-0.018,0.228-0.056 c0.209-0.107,0.314-0.346,0.254-0.573C70.054,60.218,70,59.852,70,59.5c0-2.481,2.019-4.5,4.5-4.5 c2.381,0,4.347,1.872,4.474,4.263c0.011,0.208,0.15,0.387,0.349,0.45c0.05,0.016,0.101,0.024,0.152,0.024 c0.15,0,0.296-0.069,0.392-0.192C80.638,58.563,81.779,58,83,58c2.206,0,4,1.794,4,4c0,0.117-0.017,0.23-0.032,0.343l-0.019,0.141 c-0.016,0.134,0.022,0.268,0.106,0.373c0.084,0.105,0.207,0.172,0.34,0.185C89.451,63.247,91,64.949,91,67c0,2.206-1.794,4-4,4 h-5.5c-0.276,0-0.5,0.224-0.5,0.5s0.224,0.5,0.5,0.5H87c2.757,0,5-2.243,5-5c0-2.397-1.689-4.413-4.003-4.877 C87.999,62.082,88,62.041,88,62c0-2.757-2.243-5-5-5c-1.176,0-2.293,0.416-3.183,1.164C79.219,55.76,77.055,54,74.5,54L74.5,54z");
-    			add_location(path2, file$2, 26, 1296, 2085);
+    			add_location(path2, file$2, 26, 1309, 2119);
     			attr_dev(path3, "fill", "#472b29");
     			attr_dev(path3, "d", "M73 61c-1.403 0-2.609.999-2.913 2.341C69.72 63.119 69.301 63 68.875 63c-1.202 0-2.198.897-2.353 2.068C66.319 65.022 66.126 65 65.938 65c-1.529 0-2.811 1.2-2.918 2.732C63.01 67.87 63.114 67.99 63.251 68c.006 0 .012 0 .018 0 .13 0 .24-.101.249-.232.089-1.271 1.151-2.268 2.419-2.268.229 0 .47.041.738.127.022.007.045.01.067.01.055 0 .11-.02.156-.054C66.962 65.537 67 65.455 67 65.375c0-1.034.841-1.875 1.875-1.875.447 0 .885.168 1.231.473.047.041.106.063.165.063.032 0 .063-.006.093-.019.088-.035.148-.117.155-.212C70.623 62.512 71.712 61.5 73 61.5c.208 0 .425.034.682.107.023.007.047.01.07.01.109 0 .207-.073.239-.182.038-.133-.039-.271-.172-.309C73.517 61.04 73.256 61 73 61L73 61zM86.883 62.5c-1.326 0-2.508.897-2.874 2.182-.038.133.039.271.172.309C84.205 64.997 84.228 65 84.25 65c.109 0 .209-.072.24-.182C84.795 63.748 85.779 63 86.883 63c.117 0 .23.014.342.029.012.002.023.003.035.003.121 0 .229-.092.246-.217.019-.137-.077-.263-.214-.281C87.158 62.516 87.022 62.5 86.883 62.5L86.883 62.5z");
-    			add_location(path3, file$2, 26, 2511, 3300);
+    			add_location(path3, file$2, 26, 2524, 3334);
     			attr_dev(path4, "fill", "#fff");
     			attr_dev(path4, "d", "M31.5 76h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S31.777 76 31.5 76zM34.5 76h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S34.777 76 34.5 76zM39.491 78H30.5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h8.991c.276 0 .5.224.5.5S39.767 78 39.491 78zM28.5 78h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S28.777 78 28.5 78zM25.5 78h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S25.777 78 25.5 78zM31.5 80h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S31.776 80 31.5 80zM34.5 71c-.177 0-.823 0-1 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 .823 0 1 0 .276 0 .5-.224.5-.5C35 71.224 34.776 71 34.5 71zM34.5 73c-.177 0-4.823 0-5 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 4.823 0 5 0 .276 0 .5-.224.5-.5C35 73.224 34.776 73 34.5 73zM39.5 75c-.177 0-2.823 0-3 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 2.823 0 3 0 .276 0 .5-.224.5-.5C40 75.224 39.776 75 39.5 75z");
-    			add_location(path4, file$2, 26, 3531, 4320);
+    			add_location(path4, file$2, 26, 3544, 4354);
     			attr_dev(path5, "fill", "#fff");
     			attr_dev(path5, "d", "M72.5 24h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S72.776 24 72.5 24zM76.5 24h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S76.776 24 76.5 24zM81.5 26h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S81.777 26 81.5 26zM69.5 26h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S69.776 26 69.5 26zM66.47 26H64.5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1.97c.276 0 .5.224.5.5S66.746 26 66.47 26zM75.5 22h-5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h5c.276 0 .5.224.5.5S75.777 22 75.5 22zM72.5 28h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S72.776 28 72.5 28z");
-    			add_location(path5, file$2, 26, 4471, 5260);
-    			add_location(g0, file$2, 26, 4468, 5257);
+    			add_location(path5, file$2, 26, 4484, 5294);
+    			add_location(g0, file$2, 26, 4481, 5291);
     			attr_dev(path6, "fill", "#ea5167");
     			attr_dev(path6, "d", "M37.81,47.585c1.164-6.772,7.049-11.929,14.153-11.929c3.227,0,6.196,1.076,8.595,2.872 l6.127-6.598c-4.009-3.286-9.134-5.259-14.722-5.259c-11.446,0-20.952,8.276-22.879,19.169L37.81,47.585z");
-    			add_location(path6, file$2, 26, 5108, 5897);
+    			add_location(path6, file$2, 26, 5121, 5931);
     			attr_dev(path7, "fill", "#00a698");
     			attr_dev(path7, "d", "M60.497,61.599c-2.387,1.765-5.338,2.81-8.534,2.81c-7.516,0-13.675-5.769-14.313-13.119 l-8.539,2.846c1.987,10.819,11.459,19.019,22.852,19.019c6.001,0,11.47-2.275,15.594-6.009L60.497,61.599z");
-    			add_location(path7, file$2, 26, 5321, 6110);
+    			add_location(path7, file$2, 26, 5334, 6144);
     			attr_dev(path8, "fill", "#48bed8");
     			attr_dev(path8, "d", "M69.693,45.72h-4.015H52.442v8.626h13.237c-1.028,3.272-3.194,6.039-6.034,7.839l6.944,5.787 c5.255-4.261,8.616-10.766,8.616-18.058c0-1.432-0.136-2.832-0.385-4.193H69.693z");
-    			add_location(path8, file$2, 26, 5536, 6325);
+    			add_location(path8, file$2, 26, 5549, 6359);
     			attr_dev(path9, "fill", "#fde751");
     			attr_dev(path9, "d", "M37.586,50.032c0-2.092,0.457-4.075,1.261-5.868l-7.493-4.995 c-1.679,3.214-2.634,6.866-2.634,10.744c0,3.627,0.832,7.059,2.313,10.117l7.511-5.206C38.193,53.58,37.586,51.389,37.586,50.032z");
-    			add_location(path9, file$2, 26, 5731, 6520);
-    			add_location(g1, file$2, 26, 5105, 5894);
+    			add_location(path9, file$2, 26, 5744, 6554);
+    			add_location(g1, file$2, 26, 5118, 5928);
     			attr_dev(path10, "fill", "#472b29");
     			attr_dev(path10, "d", "M51.962,73.825c-13.185,0-23.913-10.727-23.913-23.913S38.777,26,51.962,26 c5.511,0,10.89,1.922,15.146,5.411l0.552,0.452l-7.022,7.563l-0.483-0.361c-2.394-1.791-5.227-2.738-8.193-2.738 c-7.557,0-13.705,6.148-13.705,13.705s6.148,13.705,13.705,13.705c5.708,0,10.73-3.468,12.77-8.721H51.771v-9.968h23.608l0.1,0.55 c0.263,1.44,0.396,2.892,0.396,4.314C75.875,63.098,65.148,73.825,51.962,73.825z M51.962,27.342 c-12.445,0-22.57,10.125-22.57,22.57s10.125,22.57,22.57,22.57s22.57-10.125,22.57-22.57c0-1.161-0.094-2.343-0.28-3.522h-21.14 v7.284h13.48l-0.274,0.872c-1.98,6.3-7.75,10.533-14.357,10.533c-8.297,0-15.047-6.75-15.047-15.047s6.75-15.047,15.047-15.047 c3.058,0,5.985,0.915,8.506,2.652l5.231-5.633C61.775,28.993,56.925,27.342,51.962,27.342z");
-    			add_location(path10, file$2, 26, 5950, 6739);
-    			add_location(g2, file$2, 26, 5947, 6736);
+    			add_location(path10, file$2, 26, 5963, 6773);
+    			add_location(g2, file$2, 26, 5960, 6770);
     			attr_dev(path11, "fill", "#fdfcef");
     			attr_dev(path11, "d", "M36.5,36.5c0,0,1.567,0,3.5,0s3.5-1.567,3.5-3.5c0-1.781-1.335-3.234-3.055-3.455 C40.473,29.366,40.5,29.187,40.5,29c0-1.933-1.567-3.5-3.5-3.5c-1.032,0-1.95,0.455-2.59,1.165 c-0.384-1.808-1.987-3.165-3.91-3.165c-2.209,0-4,1.791-4,4c0,0.191,0.03,0.374,0.056,0.558C26.128,27.714,25.592,27.5,25,27.5 c-1.228,0-2.245,0.887-2.455,2.055C22.366,29.527,22.187,29.5,22,29.5c-1.933,0-3.5,1.567-3.5,3.5s1.567,3.5,3.5,3.5s7.5,0,7.5,0 V37h7V36.5z");
-    			add_location(path11, file$2, 26, 6720, 7509);
+    			add_location(path11, file$2, 26, 6733, 7543);
     			attr_dev(path12, "fill", "#472b29");
     			attr_dev(path12, "d", "M38.25 32C38.112 32 38 31.888 38 31.75c0-1.223.995-2.218 2.218-2.218.034.009.737-.001 1.244.136.133.036.212.173.176.306-.036.134-.173.213-.306.176-.444-.12-1.1-.12-1.113-.118-.948 0-1.719.771-1.719 1.718C38.5 31.888 38.388 32 38.25 32zM31.5 36A.5.5 0 1 0 31.5 37 .5.5 0 1 0 31.5 36z");
-    			add_location(path12, file$2, 26, 7177, 7966);
+    			add_location(path12, file$2, 26, 7190, 8000);
     			attr_dev(path13, "fill", "#472b29");
     			attr_dev(path13, "d", "M40,37h-3.5c-0.276,0-0.5-0.224-0.5-0.5s0.224-0.5,0.5-0.5H40c1.654,0,3-1.346,3-3 c0-1.496-1.125-2.768-2.618-2.959c-0.134-0.018-0.255-0.088-0.336-0.196s-0.115-0.244-0.094-0.377C39.975,29.314,40,29.16,40,29 c0-1.654-1.346-3-3-3c-0.85,0-1.638,0.355-2.219,1c-0.125,0.139-0.321,0.198-0.5,0.148c-0.182-0.049-0.321-0.195-0.36-0.379 C33.58,25.165,32.141,24,30.5,24c-1.93,0-3.5,1.57-3.5,3.5c0,0.143,0.021,0.28,0.041,0.418c0.029,0.203-0.063,0.438-0.242,0.54 c-0.179,0.102-0.396,0.118-0.556-0.01C25.878,28.155,25.449,28,25,28c-0.966,0-1.792,0.691-1.963,1.644 c-0.048,0.267-0.296,0.446-0.569,0.405C22.314,30.025,22.16,30,22,30c-1.654,0-3,1.346-3,3s1.346,3,3,3h7.5 c0.276,0,0.5,0.224,0.5,0.5S29.776,37,29.5,37H22c-2.206,0-4-1.794-4-4s1.794-4,4-4c0.059,0,0.116,0.002,0.174,0.006 C22.588,27.82,23.711,27,25,27c0.349,0,0.689,0.061,1.011,0.18C26.176,24.847,28.126,23,30.5,23c1.831,0,3.466,1.127,4.153,2.774 C35.333,25.276,36.155,25,37,25c2.206,0,4,1.794,4,4c0,0.048-0.001,0.095-0.004,0.142C42.739,29.59,44,31.169,44,33 C44,35.206,42.206,37,40,37z");
-    			add_location(path13, file$2, 26, 7486, 8275);
+    			add_location(path13, file$2, 26, 7499, 8309);
     			attr_dev(path14, "fill", "#472b29");
     			attr_dev(path14, "d", "M34.5,36c-0.159,0-0.841,0-1,0c-0.276,0-0.5,0.224-0.5,0.5c0,0.276,0.224,0.5,0.5,0.5 c0.159,0,0.841,0,1,0c0.276,0,0.5-0.224,0.5-0.5C35,36.224,34.776,36,34.5,36z");
-    			add_location(path14, file$2, 26, 8541, 9330);
-    			add_location(g3, file$2, 26, 6717, 7506);
+    			add_location(path14, file$2, 26, 8554, 9364);
+    			add_location(g3, file$2, 26, 6730, 7540);
     			attr_dev(svg, "xmlns", "http://www.w3.org/2000/svg");
     			attr_dev(svg, "viewBox", "0 0 100 100");
     			attr_dev(svg, "width", "50px");
     			attr_dev(svg, "height", "50px");
-    			add_location(svg, file$2, 26, 138, 927);
+    			add_location(svg, file$2, 26, 151, 961);
     			attr_dev(button, "class", "bg-red-500 hover:bg-red-400 text-white font-bold py-2 px-24 rounded-full inline-flex items-center");
-    			add_location(button, file$2, 26, 7, 796);
+    			add_location(button, file$2, 26, 20, 830);
     			attr_dev(div0, "class", "p-12 ");
-    			add_location(div0, file$2, 24, 6, 695);
+    			add_location(div0, file$2, 24, 16, 724);
     			attr_dev(div1, "class", "bg-white rounded-lg overflow-hidden shadow-2xl");
-    			add_location(div1, file$2, 23, 5, 628);
+    			add_location(div1, file$2, 23, 12, 647);
     			attr_dev(div2, "class", "m-auto");
-    			add_location(div2, file$2, 21, 4, 494);
+    			add_location(div2, file$2, 21, 8, 499);
     			attr_dev(body, "class", "bg-gray-200 font-sans text-gray-700 flex h-screen");
-    			add_location(body, file$2, 20, 3, 425);
+    			add_location(body, file$2, 20, 4, 426);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, body, anchor);
@@ -23894,6 +23915,8 @@ var app = (function () {
     			append_dev(g3, path13);
     			append_dev(g3, path14);
     			append_dev(button, t5);
+    			append_dev(div2, t6);
+    			append_dev(body, t7);
 
     			if (!mounted) {
     				dispose = listen_dev(button, "click", /*login*/ ctx[1], false, false, false);
