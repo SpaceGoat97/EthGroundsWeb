@@ -2,6 +2,7 @@
 
     import { auth } from '../firebase';
     import Dashcard from './Dashcard.svelte'
+    import Footer from './Footer.svelte'
     export let photoURL
 </script>
 
@@ -64,6 +65,7 @@
                 <Dashcard />
                 <Dashcard />
                 <Dashcard />
+                <Footer />
             </div>
             
           </div>
