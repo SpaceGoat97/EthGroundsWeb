@@ -53,18 +53,20 @@
           </a>
         </div>
       </nav>
-      <main class=" relative ml-20 bg-gray-200 leading-snug ">
+      <main class=" relative ml-20 bg-gray-200 leading-snug w-full">
         <div class=" text-gray-700 relative flex flex-col">
-        <div class=" items-center flex justify-between flex-wrap px-4">
-          <div class=" flex flex-col bg-white">
-            <a><img class="" style="width:20%" src="https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif"/></a>
-            <a ><img class="mx-auto" style="width:50%" src="https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124"/></a>
-            <!--Content-->
-            <Dashcard />
-            <Dashcard />
-            <Dashcard />
+          <div class=" items-center flex justify-between flex-wrap">
+            <div class=" flex-1 flex-col bg-white">
+                <a><img class="" style="width:20%" src="https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif"/></a>
+                <a ><img class="mx-auto" style="width:50%" src="https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124"/></a>
+                <!--Content-->
+                <Dashcard />
+                <Dashcard />
+                <Dashcard />
             </div>
-        </div>
+            
+          </div>
+      
         </div>
       </main>
     </div>

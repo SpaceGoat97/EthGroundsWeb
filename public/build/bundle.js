@@ -1,5 +1,5 @@
 
-(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35730/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
+(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
 var app = (function () {
     'use strict';
 
@@ -22878,20 +22878,20 @@ var app = (function () {
     			attr_dev(img1, "class", "");
     			set_style(img1, "width", "20%");
     			if (img1.src !== (img1_src_value = "https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif")) attr_dev(img1, "src", img1_src_value);
-    			add_location(img1, file$1, 59, 15, 12780);
-    			add_location(a5, file$1, 59, 12, 12777);
+    			add_location(img1, file$1, 59, 19, 12791);
+    			add_location(a5, file$1, 59, 16, 12788);
     			attr_dev(img2, "class", "mx-auto");
     			set_style(img2, "width", "50%");
     			if (img2.src !== (img2_src_value = "https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124")) attr_dev(img2, "src", img2_src_value);
-    			add_location(img2, file$1, 60, 16, 12905);
-    			add_location(a6, file$1, 60, 12, 12901);
-    			attr_dev(div2, "class", " flex flex-col bg-white");
-    			add_location(div2, file$1, 58, 10, 12727);
-    			attr_dev(div3, "class", " items-center flex justify-between flex-wrap px-4");
-    			add_location(div3, file$1, 57, 8, 12653);
+    			add_location(img2, file$1, 60, 20, 12920);
+    			add_location(a6, file$1, 60, 16, 12916);
+    			attr_dev(div2, "class", " flex-1 flex-col bg-white");
+    			add_location(div2, file$1, 58, 12, 12732);
+    			attr_dev(div3, "class", " items-center flex justify-between flex-wrap");
+    			add_location(div3, file$1, 57, 10, 12661);
     			attr_dev(div4, "class", " text-gray-700 relative flex flex-col");
-    			add_location(div4, file$1, 56, 8, 12593);
-    			attr_dev(main, "class", " relative ml-20 bg-gray-200 leading-snug ");
+    			add_location(div4, file$1, 56, 8, 12599);
+    			attr_dev(main, "class", " relative ml-20 bg-gray-200 leading-snug w-full");
     			add_location(main, file$1, 55, 6, 12528);
     			attr_dev(div5, "class", "flex flex-wrap");
     			add_location(div5, file$1, 11, 0, 186);
