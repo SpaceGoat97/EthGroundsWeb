@@ -120,11 +120,39 @@ var app = (function () {
         node.addEventListener(event, handler, options);
         return () => node.removeEventListener(event, handler, options);
     }
+    function prevent_default(fn) {
+        return function (event) {
+            event.preventDefault();
+            // @ts-ignore
+            return fn.call(this, event);
+        };
+    }
     function attr(node, attribute, value) {
         if (value == null)
             node.removeAttribute(attribute);
         else if (node.getAttribute(attribute) !== value)
             node.setAttribute(attribute, value);
+    }
+    function set_attributes(node, attributes) {
+        // @ts-ignore
+        const descriptors = Object.getOwnPropertyDescriptors(node.__proto__);
+        for (const key in attributes) {
+            if (attributes[key] == null) {
+                node.removeAttribute(key);
+            }
+            else if (key === 'style') {
+                node.style.cssText = attributes[key];
+            }
+            else if (key === '__value') {
+                node.value = node[key] = attributes[key];
+            }
+            else if (descriptors[key] && descriptors[key].set) {
+                node[key] = attributes[key];
+            }
+            else {
+                attr(node, key, attributes[key]);
+            }
+        }
     }
     function children(element) {
         return Array.from(element.childNodes);
@@ -152,6 +180,20 @@ var app = (function () {
     }
     function onDestroy(fn) {
         get_current_component().$$.on_destroy.push(fn);
+    }
+    function createEventDispatcher() {
+        const component = get_current_component();
+        return (type, detail) => {
+            const callbacks = component.$$.callbacks[type];
+            if (callbacks) {
+                // TODO are there situations where events could be dispatched
+                // in a server (non-DOM) environment?
+                const event = custom_event(type, detail);
+                callbacks.slice().forEach(fn => {
+                    fn.call(component, event);
+                });
+            }
+        };
     }
     function setContext(key, context) {
         get_current_component().$$.context.set(key, context);
@@ -689,6 +731,7 @@ var app = (function () {
         window.document.createElement
     );
     const globalHistory = createHistory(canUseDOM ? window : createMemorySource());
+    const { navigate } = globalHistory;
 
     /**
      * Adapted from https://github.com/reach/router/blob/b60e6dd781d5d3a4bdaaf4de665649c0f6a7e78d/src/lib/utils.js
@@ -703,6 +746,16 @@ var app = (function () {
     const DYNAMIC_POINTS = 2;
     const SPLAT_PENALTY = 1;
     const ROOT_POINTS = 1;
+
+    /**
+     * Check if `string` starts with `search`
+     * @param {string} string
+     * @param {string} search
+     * @return {boolean}
+     */
+    function startsWith(string, search) {
+      return string.substr(0, search.length) === search;
+    }
 
     /**
      * Check if `segment` is a root segment
@@ -910,6 +963,86 @@ var app = (function () {
     }
 
     /**
+     * Add the query to the pathname if a query is given
+     * @param {string} pathname
+     * @param {string} [query]
+     * @return {string}
+     */
+    function addQuery(pathname, query) {
+      return pathname + (query ? `?${query}` : "");
+    }
+
+    /**
+     * Resolve URIs as though every path is a directory, no files. Relative URIs
+     * in the browser can feel awkward because not only can you be "in a directory",
+     * you can be "at a file", too. For example:
+     *
+     *  browserSpecResolve('foo', '/bar/') => /bar/foo
+     *  browserSpecResolve('foo', '/bar') => /foo
+     *
+     * But on the command line of a file system, it's not as complicated. You can't
+     * `cd` from a file, only directories. This way, links have to know less about
+     * their current path. To go deeper you can do this:
+     *
+     *  <Link to="deeper"/>
+     *  // instead of
+     *  <Link to=`{${props.uri}/deeper}`/>
+     *
+     * Just like `cd`, if you want to go deeper from the command line, you do this:
+     *
+     *  cd deeper
+     *  # not
+     *  cd $(pwd)/deeper
+     *
+     * By treating every path as a directory, linking to relative paths should
+     * require less contextual information and (fingers crossed) be more intuitive.
+     * @param {string} to
+     * @param {string} base
+     * @return {string}
+     */
+    function resolve(to, base) {
+      // /foo/bar, /baz/qux => /foo/bar
+      if (startsWith(to, "/")) {
+        return to;
+      }
+
+      const [toPathname, toQuery] = to.split("?");
+      const [basePathname] = base.split("?");
+      const toSegments = segmentize(toPathname);
+      const baseSegments = segmentize(basePathname);
+
+      // ?a=b, /users?b=c => /users?a=b
+      if (toSegments[0] === "") {
+        return addQuery(basePathname, toQuery);
+      }
+
+      // profile, /users/789 => /users/789/profile
+      if (!startsWith(toSegments[0], ".")) {
+        const pathname = baseSegments.concat(toSegments).join("/");
+
+        return addQuery((basePathname === "/" ? "" : "/") + pathname, toQuery);
+      }
+
+      // ./       , /users/123 => /users/123
+      // ../      , /users/123 => /users
+      // ../..    , /users/123 => /
+      // ../../one, /a/b/c/d   => /a/b/one
+      // .././one , /a/b/c/d   => /a/b/c/one
+      const allSegments = baseSegments.concat(toSegments);
+      const segments = [];
+
+      allSegments.forEach(segment => {
+        if (segment === "..") {
+          segments.pop();
+        } else if (segment !== ".") {
+          segments.push(segment);
+        }
+      });
+
+      return addQuery("/" + segments.join("/"), toQuery);
+    }
+
+    /**
      * Combines the `basepath` and the `path` into one path.
      * @param {string} basepath
      * @param {string} path
@@ -918,6 +1051,18 @@ var app = (function () {
       return `${stripSlashes(
     path === "/" ? basepath : `${stripSlashes(basepath)}/${stripSlashes(path)}`
   )}/`;
+    }
+
+    /**
+     * Decides whether a given `event` should result in a navigation or not.
+     * @param {object} event
+     */
+    function shouldNavigate(event) {
+      return (
+        !event.defaultPrevented &&
+        event.button === 0 &&
+        !(event.metaKey || event.altKey || event.ctrlKey || event.shiftKey)
+      );
     }
 
     /* node_modules/svelte-routing/src/Router.svelte generated by Svelte v3.29.7 */
@@ -1638,6 +1783,273 @@ var app = (function () {
 
     	set component(value) {
     		throw new Error("<Route>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* node_modules/svelte-routing/src/Link.svelte generated by Svelte v3.29.7 */
+    const file = "node_modules/svelte-routing/src/Link.svelte";
+
+    function create_fragment$2(ctx) {
+    	let a;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	const default_slot_template = /*#slots*/ ctx[11].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[10], null);
+
+    	let a_levels = [
+    		{ href: /*href*/ ctx[0] },
+    		{ "aria-current": /*ariaCurrent*/ ctx[2] },
+    		/*props*/ ctx[1]
+    	];
+
+    	let a_data = {};
+
+    	for (let i = 0; i < a_levels.length; i += 1) {
+    		a_data = assign(a_data, a_levels[i]);
+    	}
+
+    	const block = {
+    		c: function create() {
+    			a = element("a");
+    			if (default_slot) default_slot.c();
+    			set_attributes(a, a_data);
+    			add_location(a, file, 40, 0, 1249);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, a, anchor);
+
+    			if (default_slot) {
+    				default_slot.m(a, null);
+    			}
+
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = listen_dev(a, "click", /*onClick*/ ctx[5], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (default_slot) {
+    				if (default_slot.p && dirty & /*$$scope*/ 1024) {
+    					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[10], dirty, null, null);
+    				}
+    			}
+
+    			set_attributes(a, a_data = get_spread_update(a_levels, [
+    				(!current || dirty & /*href*/ 1) && { href: /*href*/ ctx[0] },
+    				(!current || dirty & /*ariaCurrent*/ 4) && { "aria-current": /*ariaCurrent*/ ctx[2] },
+    				dirty & /*props*/ 2 && /*props*/ ctx[1]
+    			]));
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(default_slot, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(default_slot, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(a);
+    			if (default_slot) default_slot.d(detaching);
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$2.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$2($$self, $$props, $$invalidate) {
+    	let $base;
+    	let $location;
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("Link", slots, ['default']);
+    	let { to = "#" } = $$props;
+    	let { replace = false } = $$props;
+    	let { state = {} } = $$props;
+    	let { getProps = () => ({}) } = $$props;
+    	const { base } = getContext(ROUTER);
+    	validate_store(base, "base");
+    	component_subscribe($$self, base, value => $$invalidate(14, $base = value));
+    	const location = getContext(LOCATION);
+    	validate_store(location, "location");
+    	component_subscribe($$self, location, value => $$invalidate(15, $location = value));
+    	const dispatch = createEventDispatcher();
+    	let href, isPartiallyCurrent, isCurrent, props;
+
+    	function onClick(event) {
+    		dispatch("click", event);
+
+    		if (shouldNavigate(event)) {
+    			event.preventDefault();
+
+    			// Don't push another entry to the history stack when the user
+    			// clicks on a Link to the page they are currently on.
+    			const shouldReplace = $location.pathname === href || replace;
+
+    			navigate(href, { state, replace: shouldReplace });
+    		}
+    	}
+
+    	const writable_props = ["to", "replace", "state", "getProps"];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Link> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$$set = $$props => {
+    		if ("to" in $$props) $$invalidate(6, to = $$props.to);
+    		if ("replace" in $$props) $$invalidate(7, replace = $$props.replace);
+    		if ("state" in $$props) $$invalidate(8, state = $$props.state);
+    		if ("getProps" in $$props) $$invalidate(9, getProps = $$props.getProps);
+    		if ("$$scope" in $$props) $$invalidate(10, $$scope = $$props.$$scope);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		getContext,
+    		createEventDispatcher,
+    		ROUTER,
+    		LOCATION,
+    		navigate,
+    		startsWith,
+    		resolve,
+    		shouldNavigate,
+    		to,
+    		replace,
+    		state,
+    		getProps,
+    		base,
+    		location,
+    		dispatch,
+    		href,
+    		isPartiallyCurrent,
+    		isCurrent,
+    		props,
+    		onClick,
+    		$base,
+    		$location,
+    		ariaCurrent
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("to" in $$props) $$invalidate(6, to = $$props.to);
+    		if ("replace" in $$props) $$invalidate(7, replace = $$props.replace);
+    		if ("state" in $$props) $$invalidate(8, state = $$props.state);
+    		if ("getProps" in $$props) $$invalidate(9, getProps = $$props.getProps);
+    		if ("href" in $$props) $$invalidate(0, href = $$props.href);
+    		if ("isPartiallyCurrent" in $$props) $$invalidate(12, isPartiallyCurrent = $$props.isPartiallyCurrent);
+    		if ("isCurrent" in $$props) $$invalidate(13, isCurrent = $$props.isCurrent);
+    		if ("props" in $$props) $$invalidate(1, props = $$props.props);
+    		if ("ariaCurrent" in $$props) $$invalidate(2, ariaCurrent = $$props.ariaCurrent);
+    	};
+
+    	let ariaCurrent;
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	$$self.$$.update = () => {
+    		if ($$self.$$.dirty & /*to, $base*/ 16448) {
+    			 $$invalidate(0, href = to === "/" ? $base.uri : resolve(to, $base.uri));
+    		}
+
+    		if ($$self.$$.dirty & /*$location, href*/ 32769) {
+    			 $$invalidate(12, isPartiallyCurrent = startsWith($location.pathname, href));
+    		}
+
+    		if ($$self.$$.dirty & /*href, $location*/ 32769) {
+    			 $$invalidate(13, isCurrent = href === $location.pathname);
+    		}
+
+    		if ($$self.$$.dirty & /*isCurrent*/ 8192) {
+    			 $$invalidate(2, ariaCurrent = isCurrent ? "page" : undefined);
+    		}
+
+    		if ($$self.$$.dirty & /*getProps, $location, href, isPartiallyCurrent, isCurrent*/ 45569) {
+    			 $$invalidate(1, props = getProps({
+    				location: $location,
+    				href,
+    				isPartiallyCurrent,
+    				isCurrent
+    			}));
+    		}
+    	};
+
+    	return [
+    		href,
+    		props,
+    		ariaCurrent,
+    		base,
+    		location,
+    		onClick,
+    		to,
+    		replace,
+    		state,
+    		getProps,
+    		$$scope,
+    		slots
+    	];
+    }
+
+    class Link extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$2, create_fragment$2, safe_not_equal, { to: 6, replace: 7, state: 8, getProps: 9 });
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Link",
+    			options,
+    			id: create_fragment$2.name
+    		});
+    	}
+
+    	get to() {
+    		throw new Error("<Link>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set to(value) {
+    		throw new Error("<Link>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get replace() {
+    		throw new Error("<Link>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set replace(value) {
+    		throw new Error("<Link>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get state() {
+    		throw new Error("<Link>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set state(value) {
+    		throw new Error("<Link>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get getProps() {
+    		throw new Error("<Link>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set getProps(value) {
+    		throw new Error("<Link>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
     }
 
@@ -22401,11 +22813,75 @@ var app = (function () {
 
     const db$1 = firebase$1.firestore();
 
+    /* src/pages/Profile.svelte generated by Svelte v3.29.7 */
+
+    const file$1 = "src/pages/Profile.svelte";
+
+    function create_fragment$3(ctx) {
+    	let h1;
+
+    	const block = {
+    		c: function create() {
+    			h1 = element("h1");
+    			h1.textContent = "Hello world!";
+    			add_location(h1, file$1, 0, 0, 0);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, h1, anchor);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(h1);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$3.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$3($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("Profile", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Profile> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class Profile extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$3, create_fragment$3, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Profile",
+    			options,
+    			id: create_fragment$3.name
+    		});
+    	}
+    }
+
     /* src/component/Dashcard.svelte generated by Svelte v3.29.7 */
 
-    const file = "src/component/Dashcard.svelte";
+    const file$2 = "src/component/Dashcard.svelte";
 
-    function create_fragment$2(ctx) {
+    function create_fragment$4(ctx) {
     	let section;
     	let div2;
     	let div0;
@@ -22429,17 +22905,17 @@ var app = (function () {
     			p.textContent = "Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.\n        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.\n        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.\n        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.";
     			attr_dev(div0, "class", "h-full sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden");
     			set_style(div0, "background-image", "url('https://unsplash.it/804/800')");
-    			add_location(div0, file, 16, 4, 481);
+    			add_location(div0, file$2, 16, 4, 481);
     			attr_dev(h2, "class", "mb-2 font-black");
-    			add_location(h2, file, 20, 6, 761);
+    			add_location(h2, file$2, 20, 6, 761);
     			attr_dev(p, "class", "mb-4 text-grey-dark text-sm");
-    			add_location(p, file, 21, 6, 816);
+    			add_location(p, file$2, 21, 6, 816);
     			attr_dev(div1, "class", "px-6 py-20");
-    			add_location(div1, file, 19, 5, 730);
+    			add_location(div1, file$2, 19, 5, 730);
     			attr_dev(div2, "class", "w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex ");
-    			add_location(div2, file, 15, 2, 402);
+    			add_location(div2, file$2, 15, 2, 402);
     			attr_dev(section, "class", "mb-2 font-sans leading-normal flex");
-    			add_location(section, file, 13, 0, 321);
+    			add_location(section, file$2, 13, 0, 321);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -22464,7 +22940,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$2.name,
+    		id: create_fragment$4.name,
     		type: "component",
     		source: "",
     		ctx
@@ -22473,7 +22949,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$2($$self, $$props) {
+    function instance$4($$self, $$props) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Dashcard", slots, []);
     	const writable_props = [];
@@ -22488,22 +22964,22 @@ var app = (function () {
     class Dashcard extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$2, create_fragment$2, safe_not_equal, {});
+    		init(this, options, instance$4, create_fragment$4, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Dashcard",
     			options,
-    			id: create_fragment$2.name
+    			id: create_fragment$4.name
     		});
     	}
     }
 
     /* src/component/Footer.svelte generated by Svelte v3.29.7 */
 
-    const file$1 = "src/component/Footer.svelte";
+    const file$3 = "src/component/Footer.svelte";
 
-    function create_fragment$3(ctx) {
+    function create_fragment$5(ctx) {
     	let div2;
     	let div0;
     	let h10;
@@ -22532,17 +23008,19 @@ var app = (function () {
     			a = element("a");
     			a.textContent = "Twitter";
     			attr_dev(h10, "class", "font-sans text-xl pb-4 ");
-    			add_location(h10, file$1, 2, 8, 110);
-    			add_location(p, file$1, 3, 8, 168);
+    			add_location(h10, file$3, 2, 8, 110);
+    			add_location(p, file$3, 3, 8, 168);
     			attr_dev(div0, "class", "w-full sm:w-1/2 lg:w-1/3");
-    			add_location(div0, file$1, 1, 4, 63);
+    			add_location(div0, file$3, 1, 4, 63);
     			attr_dev(h11, "class", "font-sans text-xl pb-4");
-    			add_location(h11, file$1, 6, 8, 381);
-    			add_location(a, file$1, 7, 8, 442);
+    			add_location(h11, file$3, 6, 8, 381);
+    			attr_dev(a, "href", "https://twitter.com/EthGrounds");
+    			attr_dev(a, "target", "_blank");
+    			add_location(a, file$3, 7, 8, 442);
     			attr_dev(div1, "class", "w-full sm:w-1/2 lg:w-1/2 pl-20");
-    			add_location(div1, file$1, 5, 4, 328);
+    			add_location(div1, file$3, 5, 4, 328);
     			attr_dev(div2, "class", "bg-gray-200 py-10 mt-10 pl-12 flex flex-wrap");
-    			add_location(div2, file$1, 0, 0, 0);
+    			add_location(div2, file$3, 0, 0, 0);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -22569,7 +23047,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$3.name,
+    		id: create_fragment$5.name,
     		type: "component",
     		source: "",
     		ctx
@@ -22578,7 +23056,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$3($$self, $$props) {
+    function instance$5($$self, $$props) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Footer", slots, []);
     	const writable_props = [];
@@ -22593,111 +23071,38 @@ var app = (function () {
     class Footer extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$3, create_fragment$3, safe_not_equal, {});
+    		init(this, options, instance$5, create_fragment$5, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Footer",
     			options,
-    			id: create_fragment$3.name
+    			id: create_fragment$5.name
     		});
     	}
     }
 
-    /* src/component/Navbar.svelte generated by Svelte v3.29.7 */
-    const file$2 = "src/component/Navbar.svelte";
+    /* src/pages/Homepage.svelte generated by Svelte v3.29.7 */
+    const file$4 = "src/pages/Homepage.svelte";
 
-    function create_fragment$4(ctx) {
-    	let div5;
-    	let nav;
-    	let a0;
-    	let img0;
-    	let img0_src_value;
-    	let t0;
-    	let div0;
-    	let ul;
-    	let li0;
-    	let a1;
-    	let span0;
-    	let svg0;
-    	let g2;
-    	let g0;
-    	let path0;
-    	let path1;
-    	let path2;
-    	let path3;
-    	let path4;
-    	let path5;
-    	let path6;
-    	let g1;
-    	let path7;
-    	let circle;
-    	let path8;
-    	let t1;
-    	let li1;
-    	let a2;
-    	let span1;
-    	let svg1;
-    	let g6;
-    	let g4;
-    	let g3;
-    	let path9;
-    	let path10;
-    	let g5;
-    	let path11;
-    	let path12;
-    	let path13;
-    	let path14;
-    	let path15;
-    	let path16;
-    	let path17;
-    	let path18;
-    	let path19;
-    	let path20;
-    	let path21;
-    	let path22;
-    	let path23;
-    	let path24;
-    	let path25;
-    	let path26;
-    	let t2;
-    	let div1;
-    	let a3;
-    	let span2;
-    	let svg2;
-    	let g8;
-    	let path27;
-    	let path28;
-    	let path29;
-    	let path30;
-    	let g7;
-    	let path31;
-    	let path32;
-    	let path33;
-    	let path34;
-    	let path35;
-    	let path36;
-    	let t3;
-    	let main;
-    	let div4;
-    	let div3;
+    function create_fragment$6(ctx) {
     	let div2;
-    	let a4;
-    	let img1;
-    	let img1_src_value;
-    	let t4;
+    	let div1;
+    	let div0;
+    	let a;
+    	let img;
+    	let img_src_value;
+    	let t0;
     	let h1;
-    	let t6;
+    	let t2;
     	let dashcard0;
-    	let t7;
+    	let t3;
     	let dashcard1;
-    	let t8;
+    	let t4;
     	let dashcard2;
-    	let t9;
+    	let t5;
     	let footer;
     	let current;
-    	let mounted;
-    	let dispose;
     	dashcard0 = new Dashcard({ $$inline: true });
     	dashcard1 = new Dashcard({ $$inline: true });
     	dashcard2 = new Dashcard({ $$inline: true });
@@ -22705,381 +23110,58 @@ var app = (function () {
 
     	const block = {
     		c: function create() {
-    			div5 = element("div");
-    			nav = element("nav");
-    			a0 = element("a");
-    			img0 = element("img");
-    			t0 = space();
-    			div0 = element("div");
-    			ul = element("ul");
-    			li0 = element("li");
-    			a1 = element("a");
-    			span0 = element("span");
-    			svg0 = svg_element("svg");
-    			g2 = svg_element("g");
-    			g0 = svg_element("g");
-    			path0 = svg_element("path");
-    			path1 = svg_element("path");
-    			path2 = svg_element("path");
-    			path3 = svg_element("path");
-    			path4 = svg_element("path");
-    			path5 = svg_element("path");
-    			path6 = svg_element("path");
-    			g1 = svg_element("g");
-    			path7 = svg_element("path");
-    			circle = svg_element("circle");
-    			path8 = svg_element("path");
-    			t1 = space();
-    			li1 = element("li");
-    			a2 = element("a");
-    			span1 = element("span");
-    			svg1 = svg_element("svg");
-    			g6 = svg_element("g");
-    			g4 = svg_element("g");
-    			g3 = svg_element("g");
-    			path9 = svg_element("path");
-    			path10 = svg_element("path");
-    			g5 = svg_element("g");
-    			path11 = svg_element("path");
-    			path12 = svg_element("path");
-    			path13 = svg_element("path");
-    			path14 = svg_element("path");
-    			path15 = svg_element("path");
-    			path16 = svg_element("path");
-    			path17 = svg_element("path");
-    			path18 = svg_element("path");
-    			path19 = svg_element("path");
-    			path20 = svg_element("path");
-    			path21 = svg_element("path");
-    			path22 = svg_element("path");
-    			path23 = svg_element("path");
-    			path24 = svg_element("path");
-    			path25 = svg_element("path");
-    			path26 = svg_element("path");
-    			t2 = space();
-    			div1 = element("div");
-    			a3 = element("a");
-    			span2 = element("span");
-    			svg2 = svg_element("svg");
-    			g8 = svg_element("g");
-    			path27 = svg_element("path");
-    			path28 = svg_element("path");
-    			path29 = svg_element("path");
-    			path30 = svg_element("path");
-    			g7 = svg_element("g");
-    			path31 = svg_element("path");
-    			path32 = svg_element("path");
-    			path33 = svg_element("path");
-    			path34 = svg_element("path");
-    			path35 = svg_element("path");
-    			path36 = svg_element("path");
-    			t3 = space();
-    			main = element("main");
-    			div4 = element("div");
-    			div3 = element("div");
     			div2 = element("div");
-    			a4 = element("a");
-    			img1 = element("img");
-    			t4 = space();
+    			div1 = element("div");
+    			div0 = element("div");
+    			a = element("a");
+    			img = element("img");
+    			t0 = space();
     			h1 = element("h1");
     			h1.textContent = "Featured Projects";
-    			t6 = space();
+    			t2 = space();
     			create_component(dashcard0.$$.fragment);
-    			t7 = space();
+    			t3 = space();
     			create_component(dashcard1.$$.fragment);
-    			t8 = space();
+    			t4 = space();
     			create_component(dashcard2.$$.fragment);
-    			t9 = space();
+    			t5 = space();
     			create_component(footer.$$.fragment);
-    			if (img0.src !== (img0_src_value = /*photoURL*/ ctx[0])) attr_dev(img0, "src", img0_src_value);
-    			attr_dev(img0, "class", "rounded-full w-14 h-12");
-    			add_location(img0, file$2, 16, 12, 411);
-    			attr_dev(a0, "href", "#");
-    			add_location(a0, file$2, 15, 10, 386);
-    			attr_dev(path0, "d", "m323.736 462.003h-135.46l-28.27 40h192z");
-    			attr_dev(path0, "fill", "#c1b0b5");
-    			add_location(path0, file$2, 26, 121, 771);
-    			attr_dev(path1, "d", "m256.006 77.723c-.1.07-131.37 101.04-180 138.44v205.84h360v-205.84z");
-    			attr_dev(path1, "fill", "#f3eff0");
-    			add_location(path1, file$2, 26, 187, 837);
-    			attr_dev(path2, "d", "m256.006 77.723c-.049.034-197.838 152.159-197.84 152.16-5.77 4.4-13.18 6.75-21.16 5.97-15.08-1.46-23.32-10.07-26.21-22.85-2.83-12.51 2.17-24.11 11.05-30.88l216-166c10.712-8.162 25.6-8.168 36.32 0 140.08 107.654-20.477-15.749 216 166 7.2 5.48 11.84 14.14 11.84 23.88 0 16.57-13.43 30-30 30-6.83 0-13.12-2.28-18.16-6.12-8.524-6.556-188.942-145.316-197.84-152.16z");
-    			attr_dev(path2, "fill", "#ff7b79");
-    			add_location(path2, file$2, 26, 281, 931);
-    			attr_dev(path3, "d", "m436.006 382.163c24.14 1.92 43.24 21.08 45.53 45.13 12.16 6.86 20.47 19.75 20.47 34.71 0 22.09-17.91 40-40 40-22.39 0-62.7 0-110 0-16.57 0-30-13.43-30-30 0-13.04 8.403-24.116 20.18-28.22-1.172-23.438 17.608-41.78 39.82-41.78 3.2 0 6.27.47 9.25 1.18 10.592-14.941 27.812-22.431 44.75-21.02z");
-    			attr_dev(path3, "fill", "#d8ec84");
-    			add_location(path3, file$2, 26, 668, 1318);
-    			attr_dev(path4, "d", "m436.006 10.003v130.46l-.02.02-59.98-46.1v-84.38z");
-    			attr_dev(path4, "fill", "#c1b0b5");
-    			add_location(path4, file$2, 26, 984, 1634);
-    			attr_dev(path5, "d", "m296.006 216.003c23.68 0 40 20.07 40 43.84 0 32.88-32.55 54.65-80 96.16-47.45-41.51-80-63.28-80-96.16 0-23.77 16.32-43.84 40-43.84 30.4 0 40 35 40 35s9.6-35 40-35z");
-    			attr_dev(path5, "fill", "#ff7b79");
-    			add_location(path5, file$2, 26, 1060, 1710);
-    			attr_dev(path6, "d", "m190.006 472.003c0 16.57-13.43 30-30 30-47.3 0-87.61 0-110 0-22.09 0-40-17.91-40-40 0-14.96 8.31-27.85 20.47-34.71 2.29-24.05 21.39-43.21 45.53-45.13 16.957-1.413 34.169 6.094 44.75 21.02 2.98-.71 6.05-1.18 9.25-1.18 22.101 0 40 17.919 40 40 0 .61-.15 1.18-.18 1.78 11.787 4.108 20.18 15.192 20.18 28.22z");
-    			attr_dev(path6, "fill", "#d8ec84");
-    			add_location(path6, file$2, 26, 1250, 1900);
-    			add_location(g0, file$2, 26, 118, 768);
-    			attr_dev(path7, "d", "m216.006 206.003c-29.058 0-50 24.316-50 53.84 0 32.45 24.975 53.729 62.78 85.939 6.588 5.613 13.401 11.418 20.636 17.747 1.885 1.649 4.234 2.474 6.584 2.474s4.699-.824 6.584-2.474c7.235-6.329 14.048-12.134 20.636-17.747 37.805-32.21 62.78-53.489 62.78-85.939 0-29.527-20.947-53.84-50-53.84-19.864 0-32.463 11.342-40 22.295-7.536-10.953-20.136-22.295-40-22.295zm49.644 47.646c.076-.276 7.843-27.646 30.356-27.646 17.103 0 30 14.548 30 33.84 0 23.215-20.985 41.095-55.751 70.716-4.613 3.931-9.335 7.954-14.249 12.197-4.914-4.243-9.636-8.267-14.249-12.197-34.766-29.621-55.751-47.501-55.751-70.716 0-19.292 12.897-33.84 30-33.84 22.226 0 30.011 26.43 30.364 27.675 1.201 4.328 5.142 7.325 9.636 7.325 4.504 0 8.452-3.011 9.644-7.354z");
-    			add_location(path7, file$2, 26, 1588, 2238);
-    			attr_dev(circle, "cx", "126.006");
-    			attr_dev(circle, "cy", "102.003");
-    			attr_dev(circle, "r", "10");
-    			add_location(circle, file$2, 26, 2330, 2980);
-    			attr_dev(path8, "d", "m447.786 237.837c7.012 5.343 15.387 8.166 24.22 8.166 22.056 0 40-17.944 40-40 0-12.599-5.753-24.203-15.746-31.809l-50.254-38.621v-125.57c0-5.522-4.477-10-10-10h-60c-5.523 0-10 4.478-10 10v64.089l-85.78-65.923c-7.012-5.343-15.387-8.166-24.22-8.166s-17.208 2.823-24.254 8.191l-76.139 58.515c-4.379 3.365-5.201 9.644-1.835 14.022 3.365 4.378 9.644 5.201 14.023 1.835l76.105-58.489c3.499-2.665 7.683-4.074 12.1-4.074s8.601 1.409 12.067 4.049l216.037 166.028c5.018 3.819 7.896 9.623 7.896 15.923 0 11.028-8.972 20-20 20-4.417 0-8.601-1.409-12.064-4.047-11.202-8.615-188.803-145.21-197.839-152.16-3.467-2.667-8.265-2.771-11.845-.256-.453.317-198.135 152.375-198.156 152.392-4.009 3.058-9.021 4.465-14.133 3.968-9.902-.959-15.274-5.616-17.42-15.104-1.798-7.949 1.021-15.889 7.39-20.744l68.529-52.665c4.379-3.365 5.201-9.644 1.835-14.022s-9.645-5.201-14.023-1.835l-68.496 52.64c-12.64 9.636-18.288 25.361-14.741 41.039 4.057 17.938 16.487 28.805 34.991 30.596 10.145.993 20.157-1.839 28.197-7.971l-.015-.019c.425-.313 1.005-.75 1.791-1.35v137.199c-22.881 5.488-40.575 24.105-44.8 47.678-13.192 9.328-21.2 24.482-21.2 40.66 0 27.57 22.43 50 50 50h412c27.57 0 50-22.43 50-50 0-16.178-8.008-31.332-21.2-40.66-4.226-23.583-21.932-42.206-44.8-47.682v-137.192zm-61.78-217.834h40v100.2l-40-30.741zm-226 472h-110c-16.542 0-30-13.458-30-30 0-10.685 5.895-20.647 15.384-26 2.849-1.607 4.731-4.506 5.042-7.763 1.955-20.533 18.954-36.237 39.575-36.237 12.877 0 25.062 6.342 32.592 16.963 2.36 3.328 6.505 4.89 10.475 3.944 2.563-.61 4.831-.907 6.933-.907 16.149 0 29.802 12.97 29.998 29.647-.852 6.012 2.362 10.123 6.532 11.576 7.74 2.696 13.47 10.014 13.47 18.776-.001 11.029-8.973 20.001-20.001 20.001zm172.216-54.644c-6.181 3.497-11.283 8.54-14.826 14.645h-122.783c-3.545-6.107-8.645-11.149-14.823-14.645-.168-1.801-.434-3.588-.794-5.365h154.021c-.36 1.776-.626 3.564-.795 5.365zm-137.584 54.644c3.413-5.887 5.368-12.72 5.368-20h112c0 7.28 1.956 14.113 5.368 20zm276.943-63.763c.31 3.257 2.193 6.155 5.042 7.763 9.489 5.353 15.384 15.315 15.384 26 0 16.542-13.458 30-30 30h-110c-11.028 0-20-8.972-20-20 0-8.772 5.74-16.084 13.47-18.776 4.206-1.465 7.379-5.599 6.532-11.576.196-16.635 13.81-29.647 29.998-29.647 2.102 0 4.37.297 6.933.907 3.967.944 8.115-.615 10.475-3.944 7.531-10.621 19.715-16.963 32.592-16.963 20.613-.001 37.617 15.685 39.574 36.236zm-45.575-55.922c-14.945 1.523-28.856 8.674-38.866 19.985-1.747-.2-3.451-.3-5.134-.3-15.777 0-30.598 7.54-39.979 20h-172.041c-9.377-12.457-24.201-20-39.98-20-1.684 0-3.388.1-5.134.3-10.01-11.312-23.92-18.462-38.866-19.985v-151.229c14.516-11.165 153.296-117.907 169.999-130.751l170.001 130.749z");
-    			add_location(path8, file$2, 26, 2372, 3022);
-    			add_location(g1, file$2, 26, 1585, 2235);
-    			add_location(g2, file$2, 26, 115, 765);
-    			attr_dev(svg0, "id", "Capa_1");
-    			attr_dev(svg0, "height", "30");
-    			attr_dev(svg0, "viewBox", "0 0 500 500");
-    			attr_dev(svg0, "width", "30");
-    			attr_dev(svg0, "xmlns", "http://www.w3.org/2000/svg");
-    			add_location(svg0, file$2, 26, 18, 668);
-    			add_location(span0, file$2, 25, 16, 643);
-    			attr_dev(a1, "href", "#");
-    			add_location(a1, file$2, 24, 14, 613);
-    			attr_dev(li0, "class", "rounded-full h-12 mb-3");
-    			add_location(li0, file$2, 23, 12, 563);
-    			attr_dev(path9, "d", "m512 256c0 56.5-18.31 108.72-49.31 151.06-46.57 63.62-121.81 39.523-206.69 39.523s-160.12 24.097-206.69-39.523c-31-42.34-49.31-94.56-49.31-151.06 0-141.38 114.62-256 256-256s256 114.62 256 256z");
-    			attr_dev(path9, "fill", "#ef9b14");
-    			add_location(path9, file$2, 33, 125, 5964);
-    			add_location(g3, file$2, 33, 122, 5961);
-    			add_location(g4, file$2, 33, 119, 5958);
-    			attr_dev(path10, "d", "m256 446.583c84.88 0 160.12 24.097 206.69-39.523 31-42.34 49.31-94.56 49.31-151.06 0-1.499-.031-2.991-.057-4.484l-178.235-178.236-176.722 146.793 36.185 36.423c4.285 15.789 21.649 58.684 21.649 58.684l-165.51 91.88v.001c46.571 63.619 121.81 39.522 206.69 39.522z");
-    			attr_dev(path10, "fill", "#db8200");
-    			add_location(path10, file$2, 33, 353, 6192);
-    			attr_dev(path11, "d", "m172.246 300.33h167.507v43.67h-167.507z");
-    			attr_dev(path11, "fill", "#584b66");
-    			add_location(path11, file$2, 33, 645, 6484);
-    			attr_dev(path12, "d", "m256 300.33h83.75v43.67h-83.75z");
-    			attr_dev(path12, "fill", "#4a3e56");
-    			add_location(path12, file$2, 33, 711, 6550);
-    			attr_dev(path13, "d", "m199.97 260.488h112.06v118.84h-112.06z");
-    			attr_dev(path13, "fill", "#ffbb7d");
-    			add_location(path13, file$2, 33, 769, 6608);
-    			attr_dev(path14, "d", "m256 260.491h56.03v118.84h-56.03z");
-    			attr_dev(path14, "fill", "#efa36a");
-    			add_location(path14, file$2, 33, 834, 6673);
-    			attr_dev(path15, "d", "m134.563 332.292h242.875v114.294h-242.875z");
-    			attr_dev(path15, "fill", "#ffd4a6");
-    			add_location(path15, file$2, 33, 894, 6733);
-    			attr_dev(path16, "d", "m256 332.292h121.44v114.291h-121.44z");
-    			attr_dev(path16, "fill", "#ffbb7d");
-    			add_location(path16, file$2, 33, 963, 6802);
-    			attr_dev(path17, "d", "m462.69 407.06c-46.57 63.62-121.81 104.94-206.69 104.94s-160.12-41.32-206.69-104.94c1.28-41.51 35.34-74.77 77.16-74.77h73.5l56.03 53.71 56.03-53.71h73.51c41.83 0 75.88 33.25 77.15 74.77z");
-    			attr_dev(path17, "fill", "#7b7284");
-    			add_location(path17, file$2, 33, 1026, 6865);
-    			attr_dev(path18, "d", "m462.69 407.06c-46.57 63.62-121.81 104.94-206.69 104.94v-126l43.81-42 12.22-11.71h73.51c41.83 0 75.88 33.25 77.15 74.77z");
-    			attr_dev(path18, "fill", "#635a6d");
-    			add_location(path18, file$2, 33, 1239, 7078);
-    			attr_dev(path19, "d", "m349.62 151.149c-3.955-60.043-52.523-82.233-93.62-82.233s-89.665 22.19-93.62 82.233c-10.628 2.055-18.177 15.995-16.988 27.265l1.822 25.648c1.247 11.835 11.65 20.476 23.115 19.19l1.977-.214c23.485 63.063 60.316 69.638 83.694 73.33 23.378-3.692 60.209-10.267 83.694-73.33l1.977.214c11.465 1.286 21.868-7.354 23.115-19.19l1.822-25.648c1.189-11.27-6.36-25.21-16.988-27.265z");
-    			attr_dev(path19, "fill", "#ffd4a6");
-    			add_location(path19, file$2, 33, 1386, 7225);
-    			attr_dev(path20, "d", "m366.609 178.414-1.822 25.648c-1.247 11.835-11.65 20.476-23.115 19.19l-1.977-.214c-8.027 21.528-17.602 36.48-27.664 46.971-19.404 20.242-40.629 23.924-56.03 26.359v-227.452c41.097 0 89.665 22.19 93.62 82.233 10.627 2.055 18.176 15.995 16.988 27.265z");
-    			attr_dev(path20, "fill", "#ffbb7d");
-    			add_location(path20, file$2, 33, 1782, 7621);
-    			attr_dev(path21, "d", "m275.826 204.523c-11.431-9.719-28.221-9.719-39.652 0-12.748 10.838-28.758 17.094-45.477 17.771l-18.392.744 1.233 7.414c6.705 40.322 41.586 69.882 82.461 69.882 41.791-2.318 76.381-33.318 83.247-74.606l.447-2.69-18.392-.744c-16.717-.677-32.727-6.933-45.475-17.771z");
-    			attr_dev(path21, "fill", "#efebdc");
-    			add_location(path21, file$2, 33, 2058, 7897);
-    			attr_dev(path22, "d", "m339.69 223.04-.44 2.69c-3.43 20.65-13.8 38.72-28.53 51.92s-33.82 21.53-54.72 22.68v-103.1c7.06 0 14.12 2.43 19.83 7.29 12.74 10.84 28.75 17.1 45.47 17.77z");
-    			attr_dev(path22, "fill", "#d6cfbd");
-    			add_location(path22, file$2, 33, 2348, 8187);
-    			attr_dev(path23, "d", "m172.246 300.33 83.754 85.67-41.877 45-71.623-98.708z");
-    			attr_dev(path23, "fill", "#9d97a5");
-    			add_location(path23, file$2, 33, 2530, 8369);
-    			attr_dev(path24, "d", "m339.754 300.33-83.754 85.67 41.877 45 71.623-98.708z");
-    			attr_dev(path24, "fill", "#7f7887");
-    			add_location(path24, file$2, 33, 2610, 8449);
-    			attr_dev(path25, "d", "m199.25 29.5s-54.148 52.78-42.933 104.863l7.816 51.887h21.5l10.279-38.262c3.657-13.613 17.69-21.868 31.264-18.07 1.306.365 2.605.777 3.895 1.235l3.759 1.334c13.766 4.886 28.778 4.402 42.388-.901 2.742-1.068 5.534-1.924 8.354-2.57 13.376-3.063 26.774 5.051 30.334 18.304l10.459 38.93h21.5l7.795-54.024c1.673-46.309-35.554-102.726-156.41-102.726z");
-    			attr_dev(path25, "fill", "#494949");
-    			add_location(path25, file$2, 33, 2690, 8529);
-    			attr_dev(path26, "d", "m355.66 132.23-7.79 54.02h-21.5l-10.46-38.93c-3.56-13.25-16.96-21.37-30.34-18.3-2.82.64-5.61 1.5-8.35 2.57-6.84 2.66-14.02 4.11-21.22 4.27v-101.39c76.11 14.76 101.03 59.68 99.66 97.76z");
-    			attr_dev(path26, "fill", "#333");
-    			add_location(path26, file$2, 33, 3061, 8900);
-    			add_location(g5, file$2, 33, 642, 6481);
-    			add_location(g6, file$2, 33, 116, 5955);
-    			attr_dev(svg1, "id", "Layer_1");
-    			attr_dev(svg1, "height", "30");
-    			attr_dev(svg1, "viewBox", "0 0 500 500");
-    			attr_dev(svg1, "width", "30");
-    			attr_dev(svg1, "xmlns", "http://www.w3.org/2000/svg");
-    			add_location(svg1, file$2, 33, 18, 5857);
-    			add_location(span1, file$2, 32, 16, 5832);
-    			attr_dev(a2, "href", "#");
-    			add_location(a2, file$2, 31, 14, 5803);
-    			attr_dev(li1, "class", "rounded-full h-12 mb-3");
-    			add_location(li1, file$2, 30, 14, 5753);
-    			add_location(ul, file$2, 22, 10, 546);
-    			add_location(div0, file$2, 21, 10, 530);
-    			attr_dev(path27, "id", "XMLID_1684_");
-    			attr_dev(path27, "d", "m104 40h280v432h-280z");
-    			attr_dev(path27, "fill", "#fff");
-    			add_location(path27, file$2, 42, 131, 9447);
-    			attr_dev(path28, "id", "XMLID_1683_");
-    			attr_dev(path28, "d", "m384 472 118 30v-492l-118 30z");
-    			attr_dev(path28, "fill", "#ffcd69");
-    			add_location(path28, file$2, 42, 193, 9509);
-    			attr_dev(path29, "id", "XMLID_1195_");
-    			attr_dev(path29, "d", "m10 83.452h330v160h-330z");
-    			attr_dev(path29, "fill", "#ff7b79");
-    			add_location(path29, file$2, 42, 266, 9582);
-    			attr_dev(path30, "id", "XMLID_2473_");
-    			attr_dev(path30, "d", "m256 361-87.387-50.453v23.955h-134.068v52.996h134.068v23.955z");
-    			attr_dev(path30, "fill", "#8aa8bd");
-    			add_location(path30, file$2, 42, 334, 9650);
-    			attr_dev(path31, "id", "XMLID_573_");
-    			attr_dev(path31, "d", "m215.727 213.635c5.522 0 10-4.478 10-10v-80c0-5.523-4.478-10-10-10s-10 4.477-10 10v80c0 5.522 4.477 10 10 10z");
-    			add_location(path31, file$2, 42, 458, 9774);
-    			attr_dev(path32, "id", "XMLID_645_");
-    			attr_dev(path32, "d", "m83.402 134c5.522 0 10-4.477 10-10 0-5.522-4.478-10-10-10h-33.402c-5.522 0-10 4.478-10 10v79.27c0 5.523 4.478 10 10 10h33.401c5.522 0 10-4.477 10-10 0-5.522-4.478-10-10-10h-23.401v-19.635h20.938c5.522 0 10-4.478 10-10s-4.478-10-10-10h-20.938v-19.635z");
-    			add_location(path32, file$2, 42, 595, 9911);
-    			attr_dev(path33, "id", "XMLID_646_");
-    			attr_dev(path33, "d", "m113.611 211.81c1.75 1.233 3.76 1.826 5.75 1.826 3.143 0 6.236-1.477 8.184-4.242l21.999-31.228 21.965 31.223c1.947 2.768 5.042 4.247 8.188 4.247 1.987 0 3.995-.592 5.745-1.822 4.517-3.178 5.603-9.415 2.425-13.933l-26.087-37.084 22.123-31.404c3.181-4.515 2.1-10.753-2.416-13.934-4.514-3.181-10.753-2.099-13.934 2.416l-17.997 25.546-17.967-25.541c-3.178-4.516-9.413-5.603-13.933-2.425-4.517 3.178-5.603 9.415-2.425 13.933l22.09 31.401-26.126 37.086c-3.181 4.516-2.1 10.754 2.416 13.935z");
-    			add_location(path33, file$2, 42, 873, 10189);
-    			attr_dev(path34, "id", "XMLID_650_");
-    			attr_dev(path34, "d", "m255.727 133.635h12.001v70c0 5.522 4.478 10 10 10 5.523 0 10-4.478 10-10v-70h12.18c5.522 0 10-4.478 10-10 0-5.523-4.478-10-10-10h-44.181c-5.522 0-10 4.477-10 10 0 5.522 4.477 10 10 10z");
-    			add_location(path34, file$2, 42, 1385, 10701);
-    			attr_dev(path35, "id", "XMLID_653_");
-    			attr_dev(path35, "d", "m508.139 2.106c-2.438-1.894-5.612-2.559-8.603-1.797l-116.786 29.691h-278.75c-5.522 0-10 4.478-10 10v33.452h-84c-5.523 0-10 4.478-10 10v160c0 5.522 4.477 10 10 10h84v71.05h-59.455c-5.522 0-10 4.477-10 10v52.996c0 5.523 4.478 10 10 10h59.455v74.502c0 5.522 4.478 10 10 10h278.75l116.786 29.691c.814.207 1.641.309 2.463.309 2.201 0 4.366-.727 6.14-2.106 2.436-1.894 3.861-4.808 3.861-7.894v-492c0-3.086-1.425-6-3.861-7.894zm-488.139 91.346h310v140h-310zm24.545 251.05h124.067c5.522 0 10-4.478 10-10v-6.635l57.388 33.133-57.388 33.133v-6.635c0-5.522-4.478-10-10-10h-124.067zm447.455 144.638-98-24.915v-163.162c0-5.522-4.478-10-10-10-5.523 0-10 4.478-10 10v160.937h-260v-64.502h44.612v13.955c0 3.572 1.906 6.874 5 8.66 1.547.893 3.273 1.34 5 1.34s3.453-.446 5-1.34l87.388-50.453c3.094-1.786 5-5.088 5-8.66s-1.906-6.874-5-8.66l-87.388-50.453c-3.094-1.787-6.906-1.787-10 0-3.094 1.786-5 5.088-5 8.66v13.955h-44.612v-71.05h226c5.522 0 10-4.478 10-10v-160c0-5.522-4.478-10-10-10h-226v-23.452h260v161.062c0 5.523 4.477 10 10 10 5.522 0 10-4.477 10-10v-163.286l98-24.915z");
-    			add_location(path35, file$2, 42, 1597, 10913);
-    			attr_dev(path36, "id", "XMLID_656_");
-    			attr_dev(path36, "d", "m384.06 246.06c-2.63 0-5.21 1.07-7.069 2.931-1.86 1.859-2.931 4.439-2.931 7.069 0 2.641 1.07 5.21 2.931 7.07 1.859 1.86 4.44 2.93 7.069 2.93 2.63 0 5.21-1.069 7.07-2.93 1.87-1.86 2.93-4.44 2.93-7.07s-1.06-5.2-2.93-7.069c-1.86-1.861-4.43-2.931-7.07-2.931z");
-    			add_location(path36, file$2, 42, 2685, 12001);
-    			attr_dev(g7, "id", "XMLID_552_");
-    			add_location(g7, file$2, 42, 439, 9755);
-    			attr_dev(g8, "id", "XMLID_1484_");
-    			add_location(g8, file$2, 42, 111, 9427);
-    			attr_dev(svg2, "id", "Capa_2");
-    			attr_dev(svg2, "height", "30");
-    			attr_dev(svg2, "viewBox", "0 0 500 500");
-    			attr_dev(svg2, "width", "30");
-    			attr_dev(svg2, "xmlns", "http://www.w3.org/2000/svg");
-    			add_location(svg2, file$2, 42, 14, 9330);
-    			add_location(span2, file$2, 41, 12, 9309);
-    			attr_dev(a3, "href", "#");
-    			add_location(a3, file$2, 40, 10, 9250);
-    			attr_dev(div1, "class", "");
-    			add_location(div1, file$2, 39, 8, 9225);
-    			attr_dev(nav, "class", "flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20");
-    			add_location(nav, file$2, 14, 6, 281);
-    			attr_dev(img1, "class", "w-full");
-    			set_style(img1, "width", "100%");
-    			if (img1.src !== (img1_src_value = "https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124")) attr_dev(img1, "src", img1_src_value);
-    			add_location(img1, file$2, 51, 20, 12631);
-    			add_location(a4, file$2, 51, 16, 12627);
+    			attr_dev(img, "class", "w-full");
+    			set_style(img, "width", "80%");
+    			if (img.src !== (img_src_value = "https://img.ngfiles.com/misc/fp_featuretemp/uploads/0/343.jpg?1605745124")) attr_dev(img, "src", img_src_value);
+    			add_location(img, file$4, 9, 16, 308);
+    			add_location(a, file$4, 9, 12, 304);
     			attr_dev(h1, "class", "mx-12 my-10 font-sans text-gray-700 text-4xl");
-    			add_location(h1, file$2, 53, 16, 12802);
-    			attr_dev(div2, "class", " flex-1 flex-col bg-white");
-    			add_location(div2, file$2, 50, 12, 12571);
-    			attr_dev(div3, "class", " items-center flex justify-between flex-wrap");
-    			add_location(div3, file$2, 49, 10, 12500);
-    			attr_dev(div4, "class", " text-gray-700 relative flex flex-col");
-    			add_location(div4, file$2, 48, 8, 12438);
-    			attr_dev(main, "class", " relative ml-20 bg-gray-200 leading-snug w-full");
-    			add_location(main, file$2, 47, 6, 12367);
-    			attr_dev(div5, "class", "flex flex-wrap");
-    			add_location(div5, file$2, 12, 0, 227);
+    			add_location(h1, file$4, 11, 12, 470);
+    			attr_dev(div0, "class", " flex-1 flex-col bg-white");
+    			add_location(div0, file$4, 8, 8, 252);
+    			attr_dev(div1, "class", " items-center flex justify-between flex-wrap");
+    			add_location(div1, file$4, 7, 4, 185);
+    			attr_dev(div2, "class", " text-gray-700 relative flex flex-col");
+    			add_location(div2, file$4, 6, 0, 129);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div5, anchor);
-    			append_dev(div5, nav);
-    			append_dev(nav, a0);
-    			append_dev(a0, img0);
-    			append_dev(nav, t0);
-    			append_dev(nav, div0);
-    			append_dev(div0, ul);
-    			append_dev(ul, li0);
-    			append_dev(li0, a1);
-    			append_dev(a1, span0);
-    			append_dev(span0, svg0);
-    			append_dev(svg0, g2);
-    			append_dev(g2, g0);
-    			append_dev(g0, path0);
-    			append_dev(g0, path1);
-    			append_dev(g0, path2);
-    			append_dev(g0, path3);
-    			append_dev(g0, path4);
-    			append_dev(g0, path5);
-    			append_dev(g0, path6);
-    			append_dev(g2, g1);
-    			append_dev(g1, path7);
-    			append_dev(g1, circle);
-    			append_dev(g1, path8);
-    			append_dev(ul, t1);
-    			append_dev(ul, li1);
-    			append_dev(li1, a2);
-    			append_dev(a2, span1);
-    			append_dev(span1, svg1);
-    			append_dev(svg1, g6);
-    			append_dev(g6, g4);
-    			append_dev(g4, g3);
-    			append_dev(g3, path9);
-    			append_dev(g6, path10);
-    			append_dev(g6, g5);
-    			append_dev(g5, path11);
-    			append_dev(g5, path12);
-    			append_dev(g5, path13);
-    			append_dev(g5, path14);
-    			append_dev(g5, path15);
-    			append_dev(g5, path16);
-    			append_dev(g5, path17);
-    			append_dev(g5, path18);
-    			append_dev(g5, path19);
-    			append_dev(g5, path20);
-    			append_dev(g5, path21);
-    			append_dev(g5, path22);
-    			append_dev(g5, path23);
-    			append_dev(g5, path24);
-    			append_dev(g5, path25);
-    			append_dev(g5, path26);
-    			append_dev(nav, t2);
-    			append_dev(nav, div1);
-    			append_dev(div1, a3);
-    			append_dev(a3, span2);
-    			append_dev(span2, svg2);
-    			append_dev(svg2, g8);
-    			append_dev(g8, path27);
-    			append_dev(g8, path28);
-    			append_dev(g8, path29);
-    			append_dev(g8, path30);
-    			append_dev(g8, g7);
-    			append_dev(g7, path31);
-    			append_dev(g7, path32);
-    			append_dev(g7, path33);
-    			append_dev(g7, path34);
-    			append_dev(g7, path35);
-    			append_dev(g7, path36);
-    			append_dev(div5, t3);
-    			append_dev(div5, main);
-    			append_dev(main, div4);
-    			append_dev(div4, div3);
-    			append_dev(div3, div2);
-    			append_dev(div2, a4);
-    			append_dev(a4, img1);
-    			append_dev(div2, t4);
-    			append_dev(div2, h1);
-    			append_dev(div2, t6);
-    			mount_component(dashcard0, div2, null);
-    			append_dev(div2, t7);
-    			mount_component(dashcard1, div2, null);
-    			append_dev(div2, t8);
-    			mount_component(dashcard2, div2, null);
-    			append_dev(div2, t9);
-    			mount_component(footer, div2, null);
+    			insert_dev(target, div2, anchor);
+    			append_dev(div2, div1);
+    			append_dev(div1, div0);
+    			append_dev(div0, a);
+    			append_dev(a, img);
+    			append_dev(div0, t0);
+    			append_dev(div0, h1);
+    			append_dev(div0, t2);
+    			mount_component(dashcard0, div0, null);
+    			append_dev(div0, t3);
+    			mount_component(dashcard1, div0, null);
+    			append_dev(div0, t4);
+    			mount_component(dashcard2, div0, null);
+    			append_dev(div0, t5);
+    			mount_component(footer, div0, null);
     			current = true;
-
-    			if (!mounted) {
-    				dispose = listen_dev(a3, "click", /*click_handler*/ ctx[1], false, false, false);
-    				mounted = true;
-    			}
     		},
-    		p: function update(ctx, [dirty]) {
-    			if (!current || dirty & /*photoURL*/ 1 && img0.src !== (img0_src_value = /*photoURL*/ ctx[0])) {
-    				attr_dev(img0, "src", img0_src_value);
-    			}
-    		},
+    		p: noop,
     		i: function intro(local) {
     			if (current) return;
     			transition_in(dashcard0.$$.fragment, local);
@@ -23096,19 +23178,17 @@ var app = (function () {
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div5);
+    			if (detaching) detach_dev(div2);
     			destroy_component(dashcard0);
     			destroy_component(dashcard1);
     			destroy_component(dashcard2);
     			destroy_component(footer);
-    			mounted = false;
-    			dispose();
     		}
     	};
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$4.name,
+    		id: create_fragment$6.name,
     		type: "component",
     		source: "",
     		ctx
@@ -23117,51 +23197,746 @@ var app = (function () {
     	return block;
     }
 
-    function instance$4($$self, $$props, $$invalidate) {
+    function instance$6($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("Homepage", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Homepage> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$capture_state = () => ({ Dashcard, Footer });
+    	return [];
+    }
+
+    class Homepage extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$6, create_fragment$6, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Homepage",
+    			options,
+    			id: create_fragment$6.name
+    		});
+    	}
+    }
+
+    /* src/component/Navbar.svelte generated by Svelte v3.29.7 */
+    const file$5 = "src/component/Navbar.svelte";
+
+    // (81:12) {:else}
+    function create_else_block$1(ctx) {
+    	let h1;
+
+    	const block = {
+    		c: function create() {
+    			h1 = element("h1");
+    			h1.textContent = "404: Page Not Found";
+    			add_location(h1, file$5, 81, 12, 14022);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, h1, anchor);
+    		},
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(h1);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_else_block$1.name,
+    		type: "else",
+    		source: "(81:12) {:else}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (79:33) 
+    function create_if_block_1$1(ctx) {
+    	let profile;
+    	let current;
+    	profile = new Profile({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			create_component(profile.$$.fragment);
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(profile, target, anchor);
+    			current = true;
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(profile.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(profile.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(profile, detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_1$1.name,
+    		type: "if",
+    		source: "(79:33) ",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (77:8) {#if menu === 1}
+    function create_if_block$1(ctx) {
+    	let homepage;
+    	let current;
+    	homepage = new Homepage({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			create_component(homepage.$$.fragment);
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(homepage, target, anchor);
+    			current = true;
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(homepage.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(homepage.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(homepage, detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block$1.name,
+    		type: "if",
+    		source: "(77:8) {#if menu === 1}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$7(ctx) {
+    	let div3;
+    	let div0;
+    	let button;
+    	let span0;
+    	let t1;
+    	let svg0;
+    	let path0;
+    	let t2;
+    	let svg1;
+    	let path1;
+    	let t3;
+    	let nav;
+    	let a0;
+    	let img;
+    	let img_src_value;
+    	let t4;
+    	let div1;
+    	let ul;
+    	let li0;
+    	let a1;
+    	let span1;
+    	let svg2;
+    	let g2;
+    	let g0;
+    	let path2;
+    	let path3;
+    	let path4;
+    	let path5;
+    	let path6;
+    	let path7;
+    	let path8;
+    	let g1;
+    	let path9;
+    	let circle;
+    	let path10;
+    	let t5;
+    	let li1;
+    	let a2;
+    	let span2;
+    	let svg3;
+    	let g6;
+    	let g4;
+    	let g3;
+    	let path11;
+    	let path12;
+    	let g5;
+    	let path13;
+    	let path14;
+    	let path15;
+    	let path16;
+    	let path17;
+    	let path18;
+    	let path19;
+    	let path20;
+    	let path21;
+    	let path22;
+    	let path23;
+    	let path24;
+    	let path25;
+    	let path26;
+    	let path27;
+    	let path28;
+    	let t6;
+    	let div2;
+    	let a3;
+    	let span3;
+    	let svg4;
+    	let g8;
+    	let path29;
+    	let path30;
+    	let path31;
+    	let path32;
+    	let g7;
+    	let path33;
+    	let path34;
+    	let path35;
+    	let path36;
+    	let path37;
+    	let path38;
+    	let t7;
+    	let main;
+    	let current_block_type_index;
+    	let if_block;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	const if_block_creators = [create_if_block$1, create_if_block_1$1, create_else_block$1];
+    	const if_blocks = [];
+
+    	function select_block_type(ctx, dirty) {
+    		if (/*menu*/ ctx[0] === 1) return 0;
+    		if (/*menu*/ ctx[0] === 2) return 1;
+    		return 2;
+    	}
+
+    	current_block_type_index = select_block_type(ctx);
+    	if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+
+    	const block = {
+    		c: function create() {
+    			div3 = element("div");
+    			div0 = element("div");
+    			button = element("button");
+    			span0 = element("span");
+    			span0.textContent = "Open main menu";
+    			t1 = space();
+    			svg0 = svg_element("svg");
+    			path0 = svg_element("path");
+    			t2 = space();
+    			svg1 = svg_element("svg");
+    			path1 = svg_element("path");
+    			t3 = space();
+    			nav = element("nav");
+    			a0 = element("a");
+    			img = element("img");
+    			t4 = space();
+    			div1 = element("div");
+    			ul = element("ul");
+    			li0 = element("li");
+    			a1 = element("a");
+    			span1 = element("span");
+    			svg2 = svg_element("svg");
+    			g2 = svg_element("g");
+    			g0 = svg_element("g");
+    			path2 = svg_element("path");
+    			path3 = svg_element("path");
+    			path4 = svg_element("path");
+    			path5 = svg_element("path");
+    			path6 = svg_element("path");
+    			path7 = svg_element("path");
+    			path8 = svg_element("path");
+    			g1 = svg_element("g");
+    			path9 = svg_element("path");
+    			circle = svg_element("circle");
+    			path10 = svg_element("path");
+    			t5 = space();
+    			li1 = element("li");
+    			a2 = element("a");
+    			span2 = element("span");
+    			svg3 = svg_element("svg");
+    			g6 = svg_element("g");
+    			g4 = svg_element("g");
+    			g3 = svg_element("g");
+    			path11 = svg_element("path");
+    			path12 = svg_element("path");
+    			g5 = svg_element("g");
+    			path13 = svg_element("path");
+    			path14 = svg_element("path");
+    			path15 = svg_element("path");
+    			path16 = svg_element("path");
+    			path17 = svg_element("path");
+    			path18 = svg_element("path");
+    			path19 = svg_element("path");
+    			path20 = svg_element("path");
+    			path21 = svg_element("path");
+    			path22 = svg_element("path");
+    			path23 = svg_element("path");
+    			path24 = svg_element("path");
+    			path25 = svg_element("path");
+    			path26 = svg_element("path");
+    			path27 = svg_element("path");
+    			path28 = svg_element("path");
+    			t6 = space();
+    			div2 = element("div");
+    			a3 = element("a");
+    			span3 = element("span");
+    			svg4 = svg_element("svg");
+    			g8 = svg_element("g");
+    			path29 = svg_element("path");
+    			path30 = svg_element("path");
+    			path31 = svg_element("path");
+    			path32 = svg_element("path");
+    			g7 = svg_element("g");
+    			path33 = svg_element("path");
+    			path34 = svg_element("path");
+    			path35 = svg_element("path");
+    			path36 = svg_element("path");
+    			path37 = svg_element("path");
+    			path38 = svg_element("path");
+    			t7 = space();
+    			main = element("main");
+    			if_block.c();
+    			attr_dev(span0, "class", "sr-only");
+    			add_location(span0, file$5, 18, 10, 672);
+    			attr_dev(path0, "stroke-linecap", "round");
+    			attr_dev(path0, "stroke-linejoin", "round");
+    			attr_dev(path0, "stroke-width", "2");
+    			attr_dev(path0, "d", "M4 6h16M4 12h16M4 18h16");
+    			add_location(path0, file$5, 26, 12, 1035);
+    			attr_dev(svg0, "class", "block h-6 w-6");
+    			attr_dev(svg0, "xmlns", "http://www.w3.org/2000/svg");
+    			attr_dev(svg0, "fill", "none");
+    			attr_dev(svg0, "viewBox", "0 0 24 24");
+    			attr_dev(svg0, "stroke", "currentColor");
+    			attr_dev(svg0, "aria-hidden", "true");
+    			add_location(svg0, file$5, 25, 10, 887);
+    			attr_dev(path1, "stroke-linecap", "round");
+    			attr_dev(path1, "stroke-linejoin", "round");
+    			attr_dev(path1, "stroke-width", "2");
+    			attr_dev(path1, "d", "M6 18L18 6M6 6l12 12");
+    			add_location(path1, file$5, 35, 12, 1468);
+    			attr_dev(svg1, "class", "hidden h-6 w-6");
+    			attr_dev(svg1, "xmlns", "http://www.w3.org/2000/svg");
+    			attr_dev(svg1, "fill", "none");
+    			attr_dev(svg1, "viewBox", "0 0 24 24");
+    			attr_dev(svg1, "stroke", "currentColor");
+    			attr_dev(svg1, "aria-hidden", "true");
+    			add_location(svg1, file$5, 34, 10, 1319);
+    			attr_dev(button, "class", "inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white");
+    			attr_dev(button, "aria-expanded", "false");
+    			add_location(button, file$5, 17, 8, 453);
+    			attr_dev(div0, "class", "absolute inset-y-0 left-0 flex items-center sm:hidden");
+    			add_location(div0, file$5, 15, 2, 342);
+    			if (img.src !== (img_src_value = /*photoURL*/ ctx[1])) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "class", "rounded-full w-14 h-12");
+    			add_location(img, file$5, 42, 12, 1769);
+    			attr_dev(a0, "href", "#");
+    			add_location(a0, file$5, 41, 10, 1744);
+    			attr_dev(path2, "d", "m323.736 462.003h-135.46l-28.27 40h192z");
+    			attr_dev(path2, "fill", "#c1b0b5");
+    			add_location(path2, file$5, 52, 121, 2181);
+    			attr_dev(path3, "d", "m256.006 77.723c-.1.07-131.37 101.04-180 138.44v205.84h360v-205.84z");
+    			attr_dev(path3, "fill", "#f3eff0");
+    			add_location(path3, file$5, 52, 187, 2247);
+    			attr_dev(path4, "d", "m256.006 77.723c-.049.034-197.838 152.159-197.84 152.16-5.77 4.4-13.18 6.75-21.16 5.97-15.08-1.46-23.32-10.07-26.21-22.85-2.83-12.51 2.17-24.11 11.05-30.88l216-166c10.712-8.162 25.6-8.168 36.32 0 140.08 107.654-20.477-15.749 216 166 7.2 5.48 11.84 14.14 11.84 23.88 0 16.57-13.43 30-30 30-6.83 0-13.12-2.28-18.16-6.12-8.524-6.556-188.942-145.316-197.84-152.16z");
+    			attr_dev(path4, "fill", "#ff7b79");
+    			add_location(path4, file$5, 52, 281, 2341);
+    			attr_dev(path5, "d", "m436.006 382.163c24.14 1.92 43.24 21.08 45.53 45.13 12.16 6.86 20.47 19.75 20.47 34.71 0 22.09-17.91 40-40 40-22.39 0-62.7 0-110 0-16.57 0-30-13.43-30-30 0-13.04 8.403-24.116 20.18-28.22-1.172-23.438 17.608-41.78 39.82-41.78 3.2 0 6.27.47 9.25 1.18 10.592-14.941 27.812-22.431 44.75-21.02z");
+    			attr_dev(path5, "fill", "#d8ec84");
+    			add_location(path5, file$5, 52, 668, 2728);
+    			attr_dev(path6, "d", "m436.006 10.003v130.46l-.02.02-59.98-46.1v-84.38z");
+    			attr_dev(path6, "fill", "#c1b0b5");
+    			add_location(path6, file$5, 52, 984, 3044);
+    			attr_dev(path7, "d", "m296.006 216.003c23.68 0 40 20.07 40 43.84 0 32.88-32.55 54.65-80 96.16-47.45-41.51-80-63.28-80-96.16 0-23.77 16.32-43.84 40-43.84 30.4 0 40 35 40 35s9.6-35 40-35z");
+    			attr_dev(path7, "fill", "#ff7b79");
+    			add_location(path7, file$5, 52, 1060, 3120);
+    			attr_dev(path8, "d", "m190.006 472.003c0 16.57-13.43 30-30 30-47.3 0-87.61 0-110 0-22.09 0-40-17.91-40-40 0-14.96 8.31-27.85 20.47-34.71 2.29-24.05 21.39-43.21 45.53-45.13 16.957-1.413 34.169 6.094 44.75 21.02 2.98-.71 6.05-1.18 9.25-1.18 22.101 0 40 17.919 40 40 0 .61-.15 1.18-.18 1.78 11.787 4.108 20.18 15.192 20.18 28.22z");
+    			attr_dev(path8, "fill", "#d8ec84");
+    			add_location(path8, file$5, 52, 1250, 3310);
+    			add_location(g0, file$5, 52, 118, 2178);
+    			attr_dev(path9, "d", "m216.006 206.003c-29.058 0-50 24.316-50 53.84 0 32.45 24.975 53.729 62.78 85.939 6.588 5.613 13.401 11.418 20.636 17.747 1.885 1.649 4.234 2.474 6.584 2.474s4.699-.824 6.584-2.474c7.235-6.329 14.048-12.134 20.636-17.747 37.805-32.21 62.78-53.489 62.78-85.939 0-29.527-20.947-53.84-50-53.84-19.864 0-32.463 11.342-40 22.295-7.536-10.953-20.136-22.295-40-22.295zm49.644 47.646c.076-.276 7.843-27.646 30.356-27.646 17.103 0 30 14.548 30 33.84 0 23.215-20.985 41.095-55.751 70.716-4.613 3.931-9.335 7.954-14.249 12.197-4.914-4.243-9.636-8.267-14.249-12.197-34.766-29.621-55.751-47.501-55.751-70.716 0-19.292 12.897-33.84 30-33.84 22.226 0 30.011 26.43 30.364 27.675 1.201 4.328 5.142 7.325 9.636 7.325 4.504 0 8.452-3.011 9.644-7.354z");
+    			add_location(path9, file$5, 52, 1588, 3648);
+    			attr_dev(circle, "cx", "126.006");
+    			attr_dev(circle, "cy", "102.003");
+    			attr_dev(circle, "r", "10");
+    			add_location(circle, file$5, 52, 2330, 4390);
+    			attr_dev(path10, "d", "m447.786 237.837c7.012 5.343 15.387 8.166 24.22 8.166 22.056 0 40-17.944 40-40 0-12.599-5.753-24.203-15.746-31.809l-50.254-38.621v-125.57c0-5.522-4.477-10-10-10h-60c-5.523 0-10 4.478-10 10v64.089l-85.78-65.923c-7.012-5.343-15.387-8.166-24.22-8.166s-17.208 2.823-24.254 8.191l-76.139 58.515c-4.379 3.365-5.201 9.644-1.835 14.022 3.365 4.378 9.644 5.201 14.023 1.835l76.105-58.489c3.499-2.665 7.683-4.074 12.1-4.074s8.601 1.409 12.067 4.049l216.037 166.028c5.018 3.819 7.896 9.623 7.896 15.923 0 11.028-8.972 20-20 20-4.417 0-8.601-1.409-12.064-4.047-11.202-8.615-188.803-145.21-197.839-152.16-3.467-2.667-8.265-2.771-11.845-.256-.453.317-198.135 152.375-198.156 152.392-4.009 3.058-9.021 4.465-14.133 3.968-9.902-.959-15.274-5.616-17.42-15.104-1.798-7.949 1.021-15.889 7.39-20.744l68.529-52.665c4.379-3.365 5.201-9.644 1.835-14.022s-9.645-5.201-14.023-1.835l-68.496 52.64c-12.64 9.636-18.288 25.361-14.741 41.039 4.057 17.938 16.487 28.805 34.991 30.596 10.145.993 20.157-1.839 28.197-7.971l-.015-.019c.425-.313 1.005-.75 1.791-1.35v137.199c-22.881 5.488-40.575 24.105-44.8 47.678-13.192 9.328-21.2 24.482-21.2 40.66 0 27.57 22.43 50 50 50h412c27.57 0 50-22.43 50-50 0-16.178-8.008-31.332-21.2-40.66-4.226-23.583-21.932-42.206-44.8-47.682v-137.192zm-61.78-217.834h40v100.2l-40-30.741zm-226 472h-110c-16.542 0-30-13.458-30-30 0-10.685 5.895-20.647 15.384-26 2.849-1.607 4.731-4.506 5.042-7.763 1.955-20.533 18.954-36.237 39.575-36.237 12.877 0 25.062 6.342 32.592 16.963 2.36 3.328 6.505 4.89 10.475 3.944 2.563-.61 4.831-.907 6.933-.907 16.149 0 29.802 12.97 29.998 29.647-.852 6.012 2.362 10.123 6.532 11.576 7.74 2.696 13.47 10.014 13.47 18.776-.001 11.029-8.973 20.001-20.001 20.001zm172.216-54.644c-6.181 3.497-11.283 8.54-14.826 14.645h-122.783c-3.545-6.107-8.645-11.149-14.823-14.645-.168-1.801-.434-3.588-.794-5.365h154.021c-.36 1.776-.626 3.564-.795 5.365zm-137.584 54.644c3.413-5.887 5.368-12.72 5.368-20h112c0 7.28 1.956 14.113 5.368 20zm276.943-63.763c.31 3.257 2.193 6.155 5.042 7.763 9.489 5.353 15.384 15.315 15.384 26 0 16.542-13.458 30-30 30h-110c-11.028 0-20-8.972-20-20 0-8.772 5.74-16.084 13.47-18.776 4.206-1.465 7.379-5.599 6.532-11.576.196-16.635 13.81-29.647 29.998-29.647 2.102 0 4.37.297 6.933.907 3.967.944 8.115-.615 10.475-3.944 7.531-10.621 19.715-16.963 32.592-16.963 20.613-.001 37.617 15.685 39.574 36.236zm-45.575-55.922c-14.945 1.523-28.856 8.674-38.866 19.985-1.747-.2-3.451-.3-5.134-.3-15.777 0-30.598 7.54-39.979 20h-172.041c-9.377-12.457-24.201-20-39.98-20-1.684 0-3.388.1-5.134.3-10.01-11.312-23.92-18.462-38.866-19.985v-151.229c14.516-11.165 153.296-117.907 169.999-130.751l170.001 130.749z");
+    			add_location(path10, file$5, 52, 2372, 4432);
+    			add_location(g1, file$5, 52, 1585, 3645);
+    			add_location(g2, file$5, 52, 115, 2175);
+    			attr_dev(svg2, "id", "Capa_1");
+    			attr_dev(svg2, "height", "30");
+    			attr_dev(svg2, "viewBox", "0 0 500 500");
+    			attr_dev(svg2, "width", "30");
+    			attr_dev(svg2, "xmlns", "http://www.w3.org/2000/svg");
+    			add_location(svg2, file$5, 52, 18, 2078);
+    			add_location(span1, file$5, 51, 16, 2053);
+    			attr_dev(a1, "href", "#");
+    			add_location(a1, file$5, 50, 14, 1981);
+    			attr_dev(li0, "class", "rounded-full h-12 mb-3");
+    			add_location(li0, file$5, 49, 12, 1931);
+    			attr_dev(path11, "d", "m512 256c0 56.5-18.31 108.72-49.31 151.06-46.57 63.62-121.81 39.523-206.69 39.523s-160.12 24.097-206.69-39.523c-31-42.34-49.31-94.56-49.31-151.06 0-141.38 114.62-256 256-256s256 114.62 256 256z");
+    			attr_dev(path11, "fill", "#ef9b14");
+    			add_location(path11, file$5, 59, 125, 7417);
+    			add_location(g3, file$5, 59, 122, 7414);
+    			add_location(g4, file$5, 59, 119, 7411);
+    			attr_dev(path12, "d", "m256 446.583c84.88 0 160.12 24.097 206.69-39.523 31-42.34 49.31-94.56 49.31-151.06 0-1.499-.031-2.991-.057-4.484l-178.235-178.236-176.722 146.793 36.185 36.423c4.285 15.789 21.649 58.684 21.649 58.684l-165.51 91.88v.001c46.571 63.619 121.81 39.522 206.69 39.522z");
+    			attr_dev(path12, "fill", "#db8200");
+    			add_location(path12, file$5, 59, 353, 7645);
+    			attr_dev(path13, "d", "m172.246 300.33h167.507v43.67h-167.507z");
+    			attr_dev(path13, "fill", "#584b66");
+    			add_location(path13, file$5, 59, 645, 7937);
+    			attr_dev(path14, "d", "m256 300.33h83.75v43.67h-83.75z");
+    			attr_dev(path14, "fill", "#4a3e56");
+    			add_location(path14, file$5, 59, 711, 8003);
+    			attr_dev(path15, "d", "m199.97 260.488h112.06v118.84h-112.06z");
+    			attr_dev(path15, "fill", "#ffbb7d");
+    			add_location(path15, file$5, 59, 769, 8061);
+    			attr_dev(path16, "d", "m256 260.491h56.03v118.84h-56.03z");
+    			attr_dev(path16, "fill", "#efa36a");
+    			add_location(path16, file$5, 59, 834, 8126);
+    			attr_dev(path17, "d", "m134.563 332.292h242.875v114.294h-242.875z");
+    			attr_dev(path17, "fill", "#ffd4a6");
+    			add_location(path17, file$5, 59, 894, 8186);
+    			attr_dev(path18, "d", "m256 332.292h121.44v114.291h-121.44z");
+    			attr_dev(path18, "fill", "#ffbb7d");
+    			add_location(path18, file$5, 59, 963, 8255);
+    			attr_dev(path19, "d", "m462.69 407.06c-46.57 63.62-121.81 104.94-206.69 104.94s-160.12-41.32-206.69-104.94c1.28-41.51 35.34-74.77 77.16-74.77h73.5l56.03 53.71 56.03-53.71h73.51c41.83 0 75.88 33.25 77.15 74.77z");
+    			attr_dev(path19, "fill", "#7b7284");
+    			add_location(path19, file$5, 59, 1026, 8318);
+    			attr_dev(path20, "d", "m462.69 407.06c-46.57 63.62-121.81 104.94-206.69 104.94v-126l43.81-42 12.22-11.71h73.51c41.83 0 75.88 33.25 77.15 74.77z");
+    			attr_dev(path20, "fill", "#635a6d");
+    			add_location(path20, file$5, 59, 1239, 8531);
+    			attr_dev(path21, "d", "m349.62 151.149c-3.955-60.043-52.523-82.233-93.62-82.233s-89.665 22.19-93.62 82.233c-10.628 2.055-18.177 15.995-16.988 27.265l1.822 25.648c1.247 11.835 11.65 20.476 23.115 19.19l1.977-.214c23.485 63.063 60.316 69.638 83.694 73.33 23.378-3.692 60.209-10.267 83.694-73.33l1.977.214c11.465 1.286 21.868-7.354 23.115-19.19l1.822-25.648c1.189-11.27-6.36-25.21-16.988-27.265z");
+    			attr_dev(path21, "fill", "#ffd4a6");
+    			add_location(path21, file$5, 59, 1386, 8678);
+    			attr_dev(path22, "d", "m366.609 178.414-1.822 25.648c-1.247 11.835-11.65 20.476-23.115 19.19l-1.977-.214c-8.027 21.528-17.602 36.48-27.664 46.971-19.404 20.242-40.629 23.924-56.03 26.359v-227.452c41.097 0 89.665 22.19 93.62 82.233 10.627 2.055 18.176 15.995 16.988 27.265z");
+    			attr_dev(path22, "fill", "#ffbb7d");
+    			add_location(path22, file$5, 59, 1782, 9074);
+    			attr_dev(path23, "d", "m275.826 204.523c-11.431-9.719-28.221-9.719-39.652 0-12.748 10.838-28.758 17.094-45.477 17.771l-18.392.744 1.233 7.414c6.705 40.322 41.586 69.882 82.461 69.882 41.791-2.318 76.381-33.318 83.247-74.606l.447-2.69-18.392-.744c-16.717-.677-32.727-6.933-45.475-17.771z");
+    			attr_dev(path23, "fill", "#efebdc");
+    			add_location(path23, file$5, 59, 2058, 9350);
+    			attr_dev(path24, "d", "m339.69 223.04-.44 2.69c-3.43 20.65-13.8 38.72-28.53 51.92s-33.82 21.53-54.72 22.68v-103.1c7.06 0 14.12 2.43 19.83 7.29 12.74 10.84 28.75 17.1 45.47 17.77z");
+    			attr_dev(path24, "fill", "#d6cfbd");
+    			add_location(path24, file$5, 59, 2348, 9640);
+    			attr_dev(path25, "d", "m172.246 300.33 83.754 85.67-41.877 45-71.623-98.708z");
+    			attr_dev(path25, "fill", "#9d97a5");
+    			add_location(path25, file$5, 59, 2530, 9822);
+    			attr_dev(path26, "d", "m339.754 300.33-83.754 85.67 41.877 45 71.623-98.708z");
+    			attr_dev(path26, "fill", "#7f7887");
+    			add_location(path26, file$5, 59, 2610, 9902);
+    			attr_dev(path27, "d", "m199.25 29.5s-54.148 52.78-42.933 104.863l7.816 51.887h21.5l10.279-38.262c3.657-13.613 17.69-21.868 31.264-18.07 1.306.365 2.605.777 3.895 1.235l3.759 1.334c13.766 4.886 28.778 4.402 42.388-.901 2.742-1.068 5.534-1.924 8.354-2.57 13.376-3.063 26.774 5.051 30.334 18.304l10.459 38.93h21.5l7.795-54.024c1.673-46.309-35.554-102.726-156.41-102.726z");
+    			attr_dev(path27, "fill", "#494949");
+    			add_location(path27, file$5, 59, 2690, 9982);
+    			attr_dev(path28, "d", "m355.66 132.23-7.79 54.02h-21.5l-10.46-38.93c-3.56-13.25-16.96-21.37-30.34-18.3-2.82.64-5.61 1.5-8.35 2.57-6.84 2.66-14.02 4.11-21.22 4.27v-101.39c76.11 14.76 101.03 59.68 99.66 97.76z");
+    			attr_dev(path28, "fill", "#333");
+    			add_location(path28, file$5, 59, 3061, 10353);
+    			add_location(g5, file$5, 59, 642, 7934);
+    			add_location(g6, file$5, 59, 116, 7408);
+    			attr_dev(svg3, "id", "Layer_1");
+    			attr_dev(svg3, "height", "30");
+    			attr_dev(svg3, "viewBox", "0 0 500 500");
+    			attr_dev(svg3, "width", "30");
+    			attr_dev(svg3, "xmlns", "http://www.w3.org/2000/svg");
+    			add_location(svg3, file$5, 59, 18, 7310);
+    			add_location(span2, file$5, 58, 16, 7285);
+    			attr_dev(a2, "href", "#");
+    			add_location(a2, file$5, 57, 14, 7213);
+    			attr_dev(li1, "class", "rounded-full h-12 mb-3");
+    			add_location(li1, file$5, 56, 14, 7163);
+    			attr_dev(ul, "id", "menu");
+    			add_location(ul, file$5, 48, 10, 1904);
+    			add_location(div1, file$5, 47, 10, 1888);
+    			attr_dev(path29, "id", "XMLID_1684_");
+    			attr_dev(path29, "d", "m104 40h280v432h-280z");
+    			attr_dev(path29, "fill", "#fff");
+    			add_location(path29, file$5, 70, 131, 10912);
+    			attr_dev(path30, "id", "XMLID_1683_");
+    			attr_dev(path30, "d", "m384 472 118 30v-492l-118 30z");
+    			attr_dev(path30, "fill", "#ffcd69");
+    			add_location(path30, file$5, 70, 193, 10974);
+    			attr_dev(path31, "id", "XMLID_1195_");
+    			attr_dev(path31, "d", "m10 83.452h330v160h-330z");
+    			attr_dev(path31, "fill", "#ff7b79");
+    			add_location(path31, file$5, 70, 266, 11047);
+    			attr_dev(path32, "id", "XMLID_2473_");
+    			attr_dev(path32, "d", "m256 361-87.387-50.453v23.955h-134.068v52.996h134.068v23.955z");
+    			attr_dev(path32, "fill", "#8aa8bd");
+    			add_location(path32, file$5, 70, 334, 11115);
+    			attr_dev(path33, "id", "XMLID_573_");
+    			attr_dev(path33, "d", "m215.727 213.635c5.522 0 10-4.478 10-10v-80c0-5.523-4.478-10-10-10s-10 4.477-10 10v80c0 5.522 4.477 10 10 10z");
+    			add_location(path33, file$5, 70, 458, 11239);
+    			attr_dev(path34, "id", "XMLID_645_");
+    			attr_dev(path34, "d", "m83.402 134c5.522 0 10-4.477 10-10 0-5.522-4.478-10-10-10h-33.402c-5.522 0-10 4.478-10 10v79.27c0 5.523 4.478 10 10 10h33.401c5.522 0 10-4.477 10-10 0-5.522-4.478-10-10-10h-23.401v-19.635h20.938c5.522 0 10-4.478 10-10s-4.478-10-10-10h-20.938v-19.635z");
+    			add_location(path34, file$5, 70, 595, 11376);
+    			attr_dev(path35, "id", "XMLID_646_");
+    			attr_dev(path35, "d", "m113.611 211.81c1.75 1.233 3.76 1.826 5.75 1.826 3.143 0 6.236-1.477 8.184-4.242l21.999-31.228 21.965 31.223c1.947 2.768 5.042 4.247 8.188 4.247 1.987 0 3.995-.592 5.745-1.822 4.517-3.178 5.603-9.415 2.425-13.933l-26.087-37.084 22.123-31.404c3.181-4.515 2.1-10.753-2.416-13.934-4.514-3.181-10.753-2.099-13.934 2.416l-17.997 25.546-17.967-25.541c-3.178-4.516-9.413-5.603-13.933-2.425-4.517 3.178-5.603 9.415-2.425 13.933l22.09 31.401-26.126 37.086c-3.181 4.516-2.1 10.754 2.416 13.935z");
+    			add_location(path35, file$5, 70, 873, 11654);
+    			attr_dev(path36, "id", "XMLID_650_");
+    			attr_dev(path36, "d", "m255.727 133.635h12.001v70c0 5.522 4.478 10 10 10 5.523 0 10-4.478 10-10v-70h12.18c5.522 0 10-4.478 10-10 0-5.523-4.478-10-10-10h-44.181c-5.522 0-10 4.477-10 10 0 5.522 4.477 10 10 10z");
+    			add_location(path36, file$5, 70, 1385, 12166);
+    			attr_dev(path37, "id", "XMLID_653_");
+    			attr_dev(path37, "d", "m508.139 2.106c-2.438-1.894-5.612-2.559-8.603-1.797l-116.786 29.691h-278.75c-5.522 0-10 4.478-10 10v33.452h-84c-5.523 0-10 4.478-10 10v160c0 5.522 4.477 10 10 10h84v71.05h-59.455c-5.522 0-10 4.477-10 10v52.996c0 5.523 4.478 10 10 10h59.455v74.502c0 5.522 4.478 10 10 10h278.75l116.786 29.691c.814.207 1.641.309 2.463.309 2.201 0 4.366-.727 6.14-2.106 2.436-1.894 3.861-4.808 3.861-7.894v-492c0-3.086-1.425-6-3.861-7.894zm-488.139 91.346h310v140h-310zm24.545 251.05h124.067c5.522 0 10-4.478 10-10v-6.635l57.388 33.133-57.388 33.133v-6.635c0-5.522-4.478-10-10-10h-124.067zm447.455 144.638-98-24.915v-163.162c0-5.522-4.478-10-10-10-5.523 0-10 4.478-10 10v160.937h-260v-64.502h44.612v13.955c0 3.572 1.906 6.874 5 8.66 1.547.893 3.273 1.34 5 1.34s3.453-.446 5-1.34l87.388-50.453c3.094-1.786 5-5.088 5-8.66s-1.906-6.874-5-8.66l-87.388-50.453c-3.094-1.787-6.906-1.787-10 0-3.094 1.786-5 5.088-5 8.66v13.955h-44.612v-71.05h226c5.522 0 10-4.478 10-10v-160c0-5.522-4.478-10-10-10h-226v-23.452h260v161.062c0 5.523 4.477 10 10 10 5.522 0 10-4.477 10-10v-163.286l98-24.915z");
+    			add_location(path37, file$5, 70, 1597, 12378);
+    			attr_dev(path38, "id", "XMLID_656_");
+    			attr_dev(path38, "d", "m384.06 246.06c-2.63 0-5.21 1.07-7.069 2.931-1.86 1.859-2.931 4.439-2.931 7.069 0 2.641 1.07 5.21 2.931 7.07 1.859 1.86 4.44 2.93 7.069 2.93 2.63 0 5.21-1.069 7.07-2.93 1.87-1.86 2.93-4.44 2.93-7.07s-1.06-5.2-2.93-7.069c-1.86-1.861-4.43-2.931-7.07-2.931z");
+    			add_location(path38, file$5, 70, 2685, 13466);
+    			attr_dev(g7, "id", "XMLID_552_");
+    			add_location(g7, file$5, 70, 439, 11220);
+    			attr_dev(g8, "id", "XMLID_1484_");
+    			add_location(g8, file$5, 70, 111, 10892);
+    			attr_dev(svg4, "id", "Capa_2");
+    			attr_dev(svg4, "height", "30");
+    			attr_dev(svg4, "viewBox", "0 0 500 500");
+    			attr_dev(svg4, "width", "30");
+    			attr_dev(svg4, "xmlns", "http://www.w3.org/2000/svg");
+    			add_location(svg4, file$5, 70, 14, 10795);
+    			add_location(span3, file$5, 69, 12, 10774);
+    			attr_dev(a3, "href", "#");
+    			add_location(a3, file$5, 68, 10, 10715);
+    			attr_dev(div2, "class", "");
+    			add_location(div2, file$5, 67, 8, 10690);
+    			attr_dev(nav, "class", "flex flex-col items-center bg-purple-700 h-full justify-between py-10 fixed w-20");
+    			add_location(nav, file$5, 40, 6, 1639);
+    			attr_dev(main, "class", " relative ml-20 bg-gray-200 w-full");
+    			add_location(main, file$5, 75, 6, 13832);
+    			attr_dev(div3, "class", "flex flex-wrap");
+    			add_location(div3, file$5, 14, 0, 311);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div3, anchor);
+    			append_dev(div3, div0);
+    			append_dev(div0, button);
+    			append_dev(button, span0);
+    			append_dev(button, t1);
+    			append_dev(button, svg0);
+    			append_dev(svg0, path0);
+    			append_dev(button, t2);
+    			append_dev(button, svg1);
+    			append_dev(svg1, path1);
+    			append_dev(div3, t3);
+    			append_dev(div3, nav);
+    			append_dev(nav, a0);
+    			append_dev(a0, img);
+    			append_dev(nav, t4);
+    			append_dev(nav, div1);
+    			append_dev(div1, ul);
+    			append_dev(ul, li0);
+    			append_dev(li0, a1);
+    			append_dev(a1, span1);
+    			append_dev(span1, svg2);
+    			append_dev(svg2, g2);
+    			append_dev(g2, g0);
+    			append_dev(g0, path2);
+    			append_dev(g0, path3);
+    			append_dev(g0, path4);
+    			append_dev(g0, path5);
+    			append_dev(g0, path6);
+    			append_dev(g0, path7);
+    			append_dev(g0, path8);
+    			append_dev(g2, g1);
+    			append_dev(g1, path9);
+    			append_dev(g1, circle);
+    			append_dev(g1, path10);
+    			append_dev(ul, t5);
+    			append_dev(ul, li1);
+    			append_dev(li1, a2);
+    			append_dev(a2, span2);
+    			append_dev(span2, svg3);
+    			append_dev(svg3, g6);
+    			append_dev(g6, g4);
+    			append_dev(g4, g3);
+    			append_dev(g3, path11);
+    			append_dev(g6, path12);
+    			append_dev(g6, g5);
+    			append_dev(g5, path13);
+    			append_dev(g5, path14);
+    			append_dev(g5, path15);
+    			append_dev(g5, path16);
+    			append_dev(g5, path17);
+    			append_dev(g5, path18);
+    			append_dev(g5, path19);
+    			append_dev(g5, path20);
+    			append_dev(g5, path21);
+    			append_dev(g5, path22);
+    			append_dev(g5, path23);
+    			append_dev(g5, path24);
+    			append_dev(g5, path25);
+    			append_dev(g5, path26);
+    			append_dev(g5, path27);
+    			append_dev(g5, path28);
+    			append_dev(nav, t6);
+    			append_dev(nav, div2);
+    			append_dev(div2, a3);
+    			append_dev(a3, span3);
+    			append_dev(span3, svg4);
+    			append_dev(svg4, g8);
+    			append_dev(g8, path29);
+    			append_dev(g8, path30);
+    			append_dev(g8, path31);
+    			append_dev(g8, path32);
+    			append_dev(g8, g7);
+    			append_dev(g7, path33);
+    			append_dev(g7, path34);
+    			append_dev(g7, path35);
+    			append_dev(g7, path36);
+    			append_dev(g7, path37);
+    			append_dev(g7, path38);
+    			append_dev(div3, t7);
+    			append_dev(div3, main);
+    			if_blocks[current_block_type_index].m(main, null);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(a1, "click", prevent_default(/*click_handler*/ ctx[2]), false, true, false),
+    					listen_dev(a2, "click", prevent_default(/*click_handler_1*/ ctx[3]), false, true, false),
+    					listen_dev(a3, "click", /*click_handler_2*/ ctx[4], false, false, false)
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (!current || dirty & /*photoURL*/ 2 && img.src !== (img_src_value = /*photoURL*/ ctx[1])) {
+    				attr_dev(img, "src", img_src_value);
+    			}
+
+    			let previous_block_index = current_block_type_index;
+    			current_block_type_index = select_block_type(ctx);
+
+    			if (current_block_type_index !== previous_block_index) {
+    				group_outros();
+
+    				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+    					if_blocks[previous_block_index] = null;
+    				});
+
+    				check_outros();
+    				if_block = if_blocks[current_block_type_index];
+
+    				if (!if_block) {
+    					if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+    					if_block.c();
+    				} else {
+    					if_block.p(ctx, dirty);
+    				}
+
+    				transition_in(if_block, 1);
+    				if_block.m(main, null);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div3);
+    			if_blocks[current_block_type_index].d();
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$7.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$7($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Navbar", slots, []);
     	let { photoURL } = $$props;
-    	const writable_props = ["photoURL"];
+    	let { menu = 1 } = $$props;
+    	const writable_props = ["photoURL", "menu"];
 
     	Object.keys($$props).forEach(key => {
     		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Navbar> was created with unknown prop '${key}'`);
     	});
 
-    	const click_handler = () => auth.signOut();
+    	const click_handler = () => $$invalidate(0, menu = 1);
+    	const click_handler_1 = () => $$invalidate(0, menu = 2);
+    	const click_handler_2 = () => auth.signOut();
 
     	$$self.$$set = $$props => {
-    		if ("photoURL" in $$props) $$invalidate(0, photoURL = $$props.photoURL);
+    		if ("photoURL" in $$props) $$invalidate(1, photoURL = $$props.photoURL);
+    		if ("menu" in $$props) $$invalidate(0, menu = $$props.menu);
     	};
 
-    	$$self.$capture_state = () => ({ auth, Dashcard, Footer, photoURL });
+    	$$self.$capture_state = () => ({
+    		auth,
+    		Link,
+    		Profile,
+    		Homepage,
+    		photoURL,
+    		menu
+    	});
 
     	$$self.$inject_state = $$props => {
-    		if ("photoURL" in $$props) $$invalidate(0, photoURL = $$props.photoURL);
+    		if ("photoURL" in $$props) $$invalidate(1, photoURL = $$props.photoURL);
+    		if ("menu" in $$props) $$invalidate(0, menu = $$props.menu);
     	};
 
     	if ($$props && "$$inject" in $$props) {
     		$$self.$inject_state($$props.$$inject);
     	}
 
-    	return [photoURL, click_handler];
+    	return [menu, photoURL, click_handler, click_handler_1, click_handler_2];
     }
 
     class Navbar extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$4, create_fragment$4, safe_not_equal, { photoURL: 0 });
+    		init(this, options, instance$7, create_fragment$7, safe_not_equal, { photoURL: 1, menu: 0 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Navbar",
     			options,
-    			id: create_fragment$4.name
+    			id: create_fragment$7.name
     		});
 
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*photoURL*/ ctx[0] === undefined && !("photoURL" in props)) {
+    		if (/*photoURL*/ ctx[1] === undefined && !("photoURL" in props)) {
     			console.warn("<Navbar> was created without expected prop 'photoURL'");
     		}
     	}
@@ -23171,6 +23946,14 @@ var app = (function () {
     	}
 
     	set photoURL(value) {
+    		throw new Error("<Navbar>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get menu() {
+    		throw new Error("<Navbar>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set menu(value) {
     		throw new Error("<Navbar>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
     }
@@ -23798,10 +24581,10 @@ var app = (function () {
     }
 
     /* src/pages/Dashboard.svelte generated by Svelte v3.29.7 */
-    const file$3 = "src/pages/Dashboard.svelte";
+    const file$6 = "src/pages/Dashboard.svelte";
 
     // (20:0) {:else}
-    function create_else_block$1(ctx) {
+    function create_else_block$2(ctx) {
     	let body;
     	let div3;
     	let div2;
@@ -23869,71 +24652,71 @@ var app = (function () {
     			attr_dev(img, "alt", "Alpine logo");
     			attr_dev(img, "class", "inline-block rounded-full");
     			if (img.src !== (img_src_value = "https://ethgrounds.s3.eu-west-2.amazonaws.com/Ethgrounds+(1).gif")) attr_dev(img, "src", img_src_value);
-    			add_location(img, file$3, 23, 12, 488);
+    			add_location(img, file$6, 23, 12, 488);
     			attr_dev(path0, "fill", "#c7ede6");
     			attr_dev(path0, "d", "M87.215,56.71C88.35,54.555,89,52.105,89,49.5c0-6.621-4.159-12.257-10.001-14.478 C78.999,35.015,79,35.008,79,35c0-11.598-9.402-21-21-21c-9.784,0-17.981,6.701-20.313,15.757C36.211,29.272,34.638,29,33,29 c-7.692,0-14.023,5.793-14.89,13.252C12.906,43.353,9,47.969,9,53.5C9,59.851,14.149,65,20.5,65c0.177,0,0.352-0.012,0.526-0.022 C21.022,65.153,21,65.324,21,65.5C21,76.822,30.178,86,41.5,86c6.437,0,12.175-2.972,15.934-7.614C59.612,80.611,62.64,82,66,82 c4.65,0,8.674-2.65,10.666-6.518C77.718,75.817,78.837,76,80,76c6.075,0,11-4.925,11-11C91,61.689,89.53,58.727,87.215,56.71z");
-    			add_location(path0, file$3, 26, 330, 1075);
+    			add_location(path0, file$6, 26, 330, 1075);
     			attr_dev(path1, "fill", "#fdfcef");
     			attr_dev(path1, "d", "M78.5,71.5V72h3v-0.5c0,0,4.242,0,5.5,0c2.485,0,4.5-2.015,4.5-4.5 c0-2.333-1.782-4.229-4.055-4.455C87.467,62.364,87.5,62.187,87.5,62c0-2.485-2.015-4.5-4.5-4.5c-1.438,0-2.703,0.686-3.527,1.736 C79.333,56.6,77.171,54.5,74.5,54.5c-2.761,0-5,2.239-5,5c0,0.446,0.077,0.87,0.187,1.282C69.045,60.005,68.086,59.5,67,59.5 c-1.781,0-3.234,1.335-3.455,3.055C63.364,62.533,63.187,62.5,63,62.5c-2.485,0-4.5,2.015-4.5,4.5s2.015,4.5,4.5,4.5s9.5,0,9.5,0 H78.5z");
-    			add_location(path1, file$3, 26, 928, 1673);
+    			add_location(path1, file$6, 26, 928, 1673);
     			attr_dev(path2, "fill", "#472b29");
     			attr_dev(path2, "d", "M74.5,54c-3.033,0-5.5,2.467-5.5,5.5c0,0.016,0,0.031,0,0.047C68.398,59.192,67.71,59,67,59 c-1.831,0-3.411,1.261-3.858,3.005C63.095,62.002,63.048,62,63,62c-2.757,0-5,2.243-5,5s2.243,5,5,5h15.5 c0.276,0,0.5-0.224,0.5-0.5S78.776,71,78.5,71H63c-2.206,0-4-1.794-4-4s1.794-4,4-4c0.117,0,0.23,0.017,0.343,0.032l0.141,0.019 c0.021,0.003,0.041,0.004,0.062,0.004c0.246,0,0.462-0.185,0.495-0.437C64.232,61.125,65.504,60,67,60 c0.885,0,1.723,0.401,2.301,1.1c0.098,0.118,0.241,0.182,0.386,0.182c0.078,0,0.156-0.018,0.228-0.056 c0.209-0.107,0.314-0.346,0.254-0.573C70.054,60.218,70,59.852,70,59.5c0-2.481,2.019-4.5,4.5-4.5 c2.381,0,4.347,1.872,4.474,4.263c0.011,0.208,0.15,0.387,0.349,0.45c0.05,0.016,0.101,0.024,0.152,0.024 c0.15,0,0.296-0.069,0.392-0.192C80.638,58.563,81.779,58,83,58c2.206,0,4,1.794,4,4c0,0.117-0.017,0.23-0.032,0.343l-0.019,0.141 c-0.016,0.134,0.022,0.268,0.106,0.373c0.084,0.105,0.207,0.172,0.34,0.185C89.451,63.247,91,64.949,91,67c0,2.206-1.794,4-4,4 h-5.5c-0.276,0-0.5,0.224-0.5,0.5s0.224,0.5,0.5,0.5H87c2.757,0,5-2.243,5-5c0-2.397-1.689-4.413-4.003-4.877 C87.999,62.082,88,62.041,88,62c0-2.757-2.243-5-5-5c-1.176,0-2.293,0.416-3.183,1.164C79.219,55.76,77.055,54,74.5,54L74.5,54z");
-    			add_location(path2, file$3, 26, 1398, 2143);
+    			add_location(path2, file$6, 26, 1398, 2143);
     			attr_dev(path3, "fill", "#472b29");
     			attr_dev(path3, "d", "M73 61c-1.403 0-2.609.999-2.913 2.341C69.72 63.119 69.301 63 68.875 63c-1.202 0-2.198.897-2.353 2.068C66.319 65.022 66.126 65 65.938 65c-1.529 0-2.811 1.2-2.918 2.732C63.01 67.87 63.114 67.99 63.251 68c.006 0 .012 0 .018 0 .13 0 .24-.101.249-.232.089-1.271 1.151-2.268 2.419-2.268.229 0 .47.041.738.127.022.007.045.01.067.01.055 0 .11-.02.156-.054C66.962 65.537 67 65.455 67 65.375c0-1.034.841-1.875 1.875-1.875.447 0 .885.168 1.231.473.047.041.106.063.165.063.032 0 .063-.006.093-.019.088-.035.148-.117.155-.212C70.623 62.512 71.712 61.5 73 61.5c.208 0 .425.034.682.107.023.007.047.01.07.01.109 0 .207-.073.239-.182.038-.133-.039-.271-.172-.309C73.517 61.04 73.256 61 73 61L73 61zM86.883 62.5c-1.326 0-2.508.897-2.874 2.182-.038.133.039.271.172.309C84.205 64.997 84.228 65 84.25 65c.109 0 .209-.072.24-.182C84.795 63.748 85.779 63 86.883 63c.117 0 .23.014.342.029.012.002.023.003.035.003.121 0 .229-.092.246-.217.019-.137-.077-.263-.214-.281C87.158 62.516 87.022 62.5 86.883 62.5L86.883 62.5z");
-    			add_location(path3, file$3, 26, 2613, 3358);
+    			add_location(path3, file$6, 26, 2613, 3358);
     			attr_dev(path4, "fill", "#fff");
     			attr_dev(path4, "d", "M31.5 76h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S31.777 76 31.5 76zM34.5 76h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S34.777 76 34.5 76zM39.491 78H30.5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h8.991c.276 0 .5.224.5.5S39.767 78 39.491 78zM28.5 78h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S28.777 78 28.5 78zM25.5 78h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S25.777 78 25.5 78zM31.5 80h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S31.776 80 31.5 80zM34.5 71c-.177 0-.823 0-1 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 .823 0 1 0 .276 0 .5-.224.5-.5C35 71.224 34.776 71 34.5 71zM34.5 73c-.177 0-4.823 0-5 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 4.823 0 5 0 .276 0 .5-.224.5-.5C35 73.224 34.776 73 34.5 73zM39.5 75c-.177 0-2.823 0-3 0-.276 0-.5.224-.5.5 0 .276.224.5.5.5.177 0 2.823 0 3 0 .276 0 .5-.224.5-.5C40 75.224 39.776 75 39.5 75z");
-    			add_location(path4, file$3, 26, 3633, 4378);
+    			add_location(path4, file$6, 26, 3633, 4378);
     			attr_dev(path5, "fill", "#fff");
     			attr_dev(path5, "d", "M72.5 24h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S72.776 24 72.5 24zM76.5 24h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S76.776 24 76.5 24zM81.5 26h-10c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h10c.276 0 .5.224.5.5S81.777 26 81.5 26zM69.5 26h-1c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1c.276 0 .5.224.5.5S69.776 26 69.5 26zM66.47 26H64.5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h1.97c.276 0 .5.224.5.5S66.746 26 66.47 26zM75.5 22h-5c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h5c.276 0 .5.224.5.5S75.777 22 75.5 22zM72.5 28h-2c-.276 0-.5-.224-.5-.5s.224-.5.5-.5h2c.276 0 .5.224.5.5S72.776 28 72.5 28z");
-    			add_location(path5, file$3, 26, 4573, 5318);
-    			add_location(g0, file$3, 26, 4570, 5315);
+    			add_location(path5, file$6, 26, 4573, 5318);
+    			add_location(g0, file$6, 26, 4570, 5315);
     			attr_dev(path6, "fill", "#ea5167");
     			attr_dev(path6, "d", "M37.81,47.585c1.164-6.772,7.049-11.929,14.153-11.929c3.227,0,6.196,1.076,8.595,2.872 l6.127-6.598c-4.009-3.286-9.134-5.259-14.722-5.259c-11.446,0-20.952,8.276-22.879,19.169L37.81,47.585z");
-    			add_location(path6, file$3, 26, 5210, 5955);
+    			add_location(path6, file$6, 26, 5210, 5955);
     			attr_dev(path7, "fill", "#00a698");
     			attr_dev(path7, "d", "M60.497,61.599c-2.387,1.765-5.338,2.81-8.534,2.81c-7.516,0-13.675-5.769-14.313-13.119 l-8.539,2.846c1.987,10.819,11.459,19.019,22.852,19.019c6.001,0,11.47-2.275,15.594-6.009L60.497,61.599z");
-    			add_location(path7, file$3, 26, 5423, 6168);
+    			add_location(path7, file$6, 26, 5423, 6168);
     			attr_dev(path8, "fill", "#48bed8");
     			attr_dev(path8, "d", "M69.693,45.72h-4.015H52.442v8.626h13.237c-1.028,3.272-3.194,6.039-6.034,7.839l6.944,5.787 c5.255-4.261,8.616-10.766,8.616-18.058c0-1.432-0.136-2.832-0.385-4.193H69.693z");
-    			add_location(path8, file$3, 26, 5638, 6383);
+    			add_location(path8, file$6, 26, 5638, 6383);
     			attr_dev(path9, "fill", "#fde751");
     			attr_dev(path9, "d", "M37.586,50.032c0-2.092,0.457-4.075,1.261-5.868l-7.493-4.995 c-1.679,3.214-2.634,6.866-2.634,10.744c0,3.627,0.832,7.059,2.313,10.117l7.511-5.206C38.193,53.58,37.586,51.389,37.586,50.032z");
-    			add_location(path9, file$3, 26, 5833, 6578);
-    			add_location(g1, file$3, 26, 5207, 5952);
+    			add_location(path9, file$6, 26, 5833, 6578);
+    			add_location(g1, file$6, 26, 5207, 5952);
     			attr_dev(path10, "fill", "#472b29");
     			attr_dev(path10, "d", "M51.962,73.825c-13.185,0-23.913-10.727-23.913-23.913S38.777,26,51.962,26 c5.511,0,10.89,1.922,15.146,5.411l0.552,0.452l-7.022,7.563l-0.483-0.361c-2.394-1.791-5.227-2.738-8.193-2.738 c-7.557,0-13.705,6.148-13.705,13.705s6.148,13.705,13.705,13.705c5.708,0,10.73-3.468,12.77-8.721H51.771v-9.968h23.608l0.1,0.55 c0.263,1.44,0.396,2.892,0.396,4.314C75.875,63.098,65.148,73.825,51.962,73.825z M51.962,27.342 c-12.445,0-22.57,10.125-22.57,22.57s10.125,22.57,22.57,22.57s22.57-10.125,22.57-22.57c0-1.161-0.094-2.343-0.28-3.522h-21.14 v7.284h13.48l-0.274,0.872c-1.98,6.3-7.75,10.533-14.357,10.533c-8.297,0-15.047-6.75-15.047-15.047s6.75-15.047,15.047-15.047 c3.058,0,5.985,0.915,8.506,2.652l5.231-5.633C61.775,28.993,56.925,27.342,51.962,27.342z");
-    			add_location(path10, file$3, 26, 6052, 6797);
-    			add_location(g2, file$3, 26, 6049, 6794);
+    			add_location(path10, file$6, 26, 6052, 6797);
+    			add_location(g2, file$6, 26, 6049, 6794);
     			attr_dev(path11, "fill", "#fdfcef");
     			attr_dev(path11, "d", "M36.5,36.5c0,0,1.567,0,3.5,0s3.5-1.567,3.5-3.5c0-1.781-1.335-3.234-3.055-3.455 C40.473,29.366,40.5,29.187,40.5,29c0-1.933-1.567-3.5-3.5-3.5c-1.032,0-1.95,0.455-2.59,1.165 c-0.384-1.808-1.987-3.165-3.91-3.165c-2.209,0-4,1.791-4,4c0,0.191,0.03,0.374,0.056,0.558C26.128,27.714,25.592,27.5,25,27.5 c-1.228,0-2.245,0.887-2.455,2.055C22.366,29.527,22.187,29.5,22,29.5c-1.933,0-3.5,1.567-3.5,3.5s1.567,3.5,3.5,3.5s7.5,0,7.5,0 V37h7V36.5z");
-    			add_location(path11, file$3, 26, 6822, 7567);
+    			add_location(path11, file$6, 26, 6822, 7567);
     			attr_dev(path12, "fill", "#472b29");
     			attr_dev(path12, "d", "M38.25 32C38.112 32 38 31.888 38 31.75c0-1.223.995-2.218 2.218-2.218.034.009.737-.001 1.244.136.133.036.212.173.176.306-.036.134-.173.213-.306.176-.444-.12-1.1-.12-1.113-.118-.948 0-1.719.771-1.719 1.718C38.5 31.888 38.388 32 38.25 32zM31.5 36A.5.5 0 1 0 31.5 37 .5.5 0 1 0 31.5 36z");
-    			add_location(path12, file$3, 26, 7279, 8024);
+    			add_location(path12, file$6, 26, 7279, 8024);
     			attr_dev(path13, "fill", "#472b29");
     			attr_dev(path13, "d", "M40,37h-3.5c-0.276,0-0.5-0.224-0.5-0.5s0.224-0.5,0.5-0.5H40c1.654,0,3-1.346,3-3 c0-1.496-1.125-2.768-2.618-2.959c-0.134-0.018-0.255-0.088-0.336-0.196s-0.115-0.244-0.094-0.377C39.975,29.314,40,29.16,40,29 c0-1.654-1.346-3-3-3c-0.85,0-1.638,0.355-2.219,1c-0.125,0.139-0.321,0.198-0.5,0.148c-0.182-0.049-0.321-0.195-0.36-0.379 C33.58,25.165,32.141,24,30.5,24c-1.93,0-3.5,1.57-3.5,3.5c0,0.143,0.021,0.28,0.041,0.418c0.029,0.203-0.063,0.438-0.242,0.54 c-0.179,0.102-0.396,0.118-0.556-0.01C25.878,28.155,25.449,28,25,28c-0.966,0-1.792,0.691-1.963,1.644 c-0.048,0.267-0.296,0.446-0.569,0.405C22.314,30.025,22.16,30,22,30c-1.654,0-3,1.346-3,3s1.346,3,3,3h7.5 c0.276,0,0.5,0.224,0.5,0.5S29.776,37,29.5,37H22c-2.206,0-4-1.794-4-4s1.794-4,4-4c0.059,0,0.116,0.002,0.174,0.006 C22.588,27.82,23.711,27,25,27c0.349,0,0.689,0.061,1.011,0.18C26.176,24.847,28.126,23,30.5,23c1.831,0,3.466,1.127,4.153,2.774 C35.333,25.276,36.155,25,37,25c2.206,0,4,1.794,4,4c0,0.048-0.001,0.095-0.004,0.142C42.739,29.59,44,31.169,44,33 C44,35.206,42.206,37,40,37z");
-    			add_location(path13, file$3, 26, 7588, 8333);
+    			add_location(path13, file$6, 26, 7588, 8333);
     			attr_dev(path14, "fill", "#472b29");
     			attr_dev(path14, "d", "M34.5,36c-0.159,0-0.841,0-1,0c-0.276,0-0.5,0.224-0.5,0.5c0,0.276,0.224,0.5,0.5,0.5 c0.159,0,0.841,0,1,0c0.276,0,0.5-0.224,0.5-0.5C35,36.224,34.776,36,34.5,36z");
-    			add_location(path14, file$3, 26, 8643, 9388);
-    			add_location(g3, file$3, 26, 6819, 7564);
+    			add_location(path14, file$6, 26, 8643, 9388);
+    			add_location(g3, file$6, 26, 6819, 7564);
     			attr_dev(svg, "xmlns", "http://www.w3.org/2000/svg");
     			attr_dev(svg, "viewBox", "0 0 100 100");
     			attr_dev(svg, "width", "50px");
     			attr_dev(svg, "height", "50px");
-    			add_location(svg, file$3, 26, 240, 985);
+    			add_location(svg, file$6, 26, 240, 985);
     			attr_dev(button, "class", "bg-red-500 text-white active:bg-pink-600 font-bold uppercase inline-flex text-base px-8 py-3 rounded-full items-center shadow-md hover:shadow-lg outline-none focus:outline-none mr-1 mb-1");
-    			add_location(button, file$3, 26, 20, 765);
+    			add_location(button, file$6, 26, 20, 765);
     			attr_dev(div0, "class", "bg-white text-purple-600 font-bold");
-    			add_location(div0, file$3, 25, 16, 696);
+    			add_location(div0, file$6, 25, 16, 696);
     			attr_dev(div1, "class", "flex items-center justify-center ");
-    			add_location(div1, file$3, 24, 12, 632);
+    			add_location(div1, file$6, 24, 12, 632);
     			attr_dev(div2, "class", "text-center");
-    			add_location(div2, file$3, 22, 8, 449);
-    			add_location(div3, file$3, 21, 2, 435);
-    			add_location(body, file$3, 20, 4, 426);
+    			add_location(div2, file$6, 22, 8, 449);
+    			add_location(div3, file$6, 21, 2, 435);
+    			add_location(body, file$6, 20, 4, 426);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, body, anchor);
@@ -23983,7 +24766,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_else_block$1.name,
+    		id: create_else_block$2.name,
     		type: "else",
     		source: "(20:0) {:else}",
     		ctx
@@ -23993,7 +24776,7 @@ var app = (function () {
     }
 
     // (18:0) {#if user}
-    function create_if_block$1(ctx) {
+    function create_if_block$2(ctx) {
     	let navbar;
     	let current;
     	const navbar_spread_levels = [/*user*/ ctx[0]];
@@ -24036,7 +24819,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_if_block$1.name,
+    		id: create_if_block$2.name,
     		type: "if",
     		source: "(18:0) {#if user}",
     		ctx
@@ -24045,12 +24828,12 @@ var app = (function () {
     	return block;
     }
 
-    function create_fragment$5(ctx) {
+    function create_fragment$8(ctx) {
     	let section;
     	let current_block_type_index;
     	let if_block;
     	let current;
-    	const if_block_creators = [create_if_block$1, create_else_block$1];
+    	const if_block_creators = [create_if_block$2, create_else_block$2];
     	const if_blocks = [];
 
     	function select_block_type(ctx, dirty) {
@@ -24065,7 +24848,7 @@ var app = (function () {
     		c: function create() {
     			section = element("section");
     			if_block.c();
-    			add_location(section, file$3, 16, 0, 368);
+    			add_location(section, file$6, 16, 0, 368);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -24119,7 +24902,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$5.name,
+    		id: create_fragment$8.name,
     		type: "component",
     		source: "",
     		ctx
@@ -24128,7 +24911,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$5($$self, $$props, $$invalidate) {
+    function instance$8($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Dashboard", slots, []);
     	let user;
@@ -24170,55 +24953,69 @@ var app = (function () {
     class Dashboard extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$5, create_fragment$5, safe_not_equal, {});
+    		init(this, options, instance$8, create_fragment$8, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Dashboard",
     			options,
-    			id: create_fragment$5.name
+    			id: create_fragment$8.name
     		});
     	}
     }
 
     /* src/routes/index.svelte generated by Svelte v3.29.7 */
-    const file$4 = "src/routes/index.svelte";
+    const file$7 = "src/routes/index.svelte";
 
-    // (8:0) <Router {url}>
+    // (10:0) <Router {url}>
     function create_default_slot(ctx) {
     	let div;
-    	let route;
+    	let route0;
+    	let t;
+    	let route1;
     	let current;
 
-    	route = new Route({
+    	route0 = new Route({
     			props: { path: "/", component: Dashboard },
+    			$$inline: true
+    		});
+
+    	route1 = new Route({
+    			props: { path: "profile", component: Profile },
     			$$inline: true
     		});
 
     	const block = {
     		c: function create() {
     			div = element("div");
-    			create_component(route.$$.fragment);
-    			add_location(div, file$4, 8, 2, 164);
+    			create_component(route0.$$.fragment);
+    			t = space();
+    			create_component(route1.$$.fragment);
+    			add_location(div, file$7, 10, 2, 214);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, div, anchor);
-    			mount_component(route, div, null);
+    			mount_component(route0, div, null);
+    			append_dev(div, t);
+    			mount_component(route1, div, null);
     			current = true;
     		},
     		p: noop,
     		i: function intro(local) {
     			if (current) return;
-    			transition_in(route.$$.fragment, local);
+    			transition_in(route0.$$.fragment, local);
+    			transition_in(route1.$$.fragment, local);
     			current = true;
     		},
     		o: function outro(local) {
-    			transition_out(route.$$.fragment, local);
+    			transition_out(route0.$$.fragment, local);
+    			transition_out(route1.$$.fragment, local);
     			current = false;
     		},
     		d: function destroy(detaching) {
     			if (detaching) detach_dev(div);
-    			destroy_component(route);
+    			destroy_component(route0);
+    			destroy_component(route1);
     		}
     	};
 
@@ -24226,14 +25023,14 @@ var app = (function () {
     		block,
     		id: create_default_slot.name,
     		type: "slot",
-    		source: "(8:0) <Router {url}>",
+    		source: "(10:0) <Router {url}>",
     		ctx
     	});
 
     	return block;
     }
 
-    function create_fragment$6(ctx) {
+    function create_fragment$9(ctx) {
     	let router;
     	let current;
 
@@ -24283,7 +25080,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$6.name,
+    		id: create_fragment$9.name,
     		type: "component",
     		source: "",
     		ctx
@@ -24292,7 +25089,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$6($$self, $$props, $$invalidate) {
+    function instance$9($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Routes", slots, []);
     	let { url = "" } = $$props;
@@ -24306,7 +25103,7 @@ var app = (function () {
     		if ("url" in $$props) $$invalidate(0, url = $$props.url);
     	};
 
-    	$$self.$capture_state = () => ({ Router, Route, Dashboard, url });
+    	$$self.$capture_state = () => ({ Router, Route, Dashboard, Profile, url });
 
     	$$self.$inject_state = $$props => {
     		if ("url" in $$props) $$invalidate(0, url = $$props.url);
@@ -24322,13 +25119,13 @@ var app = (function () {
     class Routes extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$6, create_fragment$6, safe_not_equal, { url: 0 });
+    		init(this, options, instance$9, create_fragment$9, safe_not_equal, { url: 0 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Routes",
     			options,
-    			id: create_fragment$6.name
+    			id: create_fragment$9.name
     		});
     	}
 
@@ -24343,7 +25140,7 @@ var app = (function () {
 
     /* src/App.svelte generated by Svelte v3.29.7 */
 
-    function create_fragment$7(ctx) {
+    function create_fragment$a(ctx) {
     	let router;
     	let current;
     	router = new Routes({ $$inline: true });
@@ -24376,7 +25173,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$7.name,
+    		id: create_fragment$a.name,
     		type: "component",
     		source: "",
     		ctx
@@ -24385,7 +25182,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$7($$self, $$props, $$invalidate) {
+    function instance$a($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("App", slots, []);
     	const writable_props = [];
@@ -24401,13 +25198,13 @@ var app = (function () {
     class App extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$7, create_fragment$7, safe_not_equal, {});
+    		init(this, options, instance$a, create_fragment$a, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "App",
     			options,
-    			id: create_fragment$7.name
+    			id: create_fragment$a.name
     		});
     	}
     }

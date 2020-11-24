@@ -5,6 +5,6 @@
     </div>
     <div class="w-full sm:w-1/2 lg:w-1/2 pl-20">
         <h1 class="font-sans text-xl pb-4">Social Media</h1>
-        <a>Twitter</a>
+        <a href="https://twitter.com/EthGrounds" target="_blank">Twitter</a>
     </div>
 </div>
