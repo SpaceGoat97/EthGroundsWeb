@@ -11,9 +11,9 @@
     }
 </style>
 <!-- wrapper -->
-<section class="mb-2 font-sans leading-normal flex">
+<section class="mb-2 font-sans flex">
         <main class="w-full overflow-y-auto">
-        <div class="px-10 mt-5">
+        <div class="px-10">
           <span class="uppercase font-bold text-2xl text-white"
             >EthGrounds</span
           >
