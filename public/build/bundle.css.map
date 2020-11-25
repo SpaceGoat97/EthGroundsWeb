@@ -1,11 +1,11 @@
 {
   "version": 3,
   "file": "bundle.css",
-  "sources": [
-    "Dashcard.svelte"
-  ],
-  "sourcesContent": [
-    "\n<style>\n    button {\n        background-color: #6617cb;\n        background-image: linear-gradient(315deg, #6617cb 0%, #cb218e 74%);\n        box-shadow: 0 0 0 0 #ec008c, 0.2rem 0.2rem 30px #6617cb;\n    }\n    button:hover {\n        box-shadow: 0 0 0 0 #ec008c, 0.2rem 0.2rem 60px #6617cb;\n    }\n</style>\n\n\n\n  \n<!-- wrapper -->\n<section class=\"mb-2 font-sans leading-normal flex\">\n\n  <!-- card container -->\n  <div class=\"w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex\">\n    <div class=\"h-48 sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden\" style=\"background-image: url('https://unsplash.it/804/800')\">\n    </div>\n    \n    <!-- card-content -->\n     <div class=\"px-6 py-4\">\n      <h2 class=\"mb-2 font-black\">Hello Tailwind!</h2>\n      <p class=\"mb-4 text-grey-dark text-sm\">\n        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.\n       </p>\n      \n       <!-- button -->\n      <button class=\"py-3 px-6 text-white font-bold rounded-full mt-1 mb-2\">\n        Hey, click me.\n       </button>\n       \n    </div>\n\n  </div>\n  \n</section>"
+  "sources": [],
+  "sourcesContent": [],
+  "names": [],
+  "mappings": ""
+}yle>\n    button {\n        background-color: #6617cb;\n        background-image: linear-gradient(315deg, #6617cb 0%, #cb218e 74%);\n        box-shadow: 0 0 0 0 #ec008c, 0.2rem 0.2rem 30px #6617cb;\n    }\n    button:hover {\n        box-shadow: 0 0 0 0 #ec008c, 0.2rem 0.2rem 60px #6617cb;\n    }\n</style>\n\n\n\n  \n<!-- wrapper -->\n<section class=\"mb-2 font-sans leading-normal flex\">\n\n  <!-- card container -->\n  <div class=\"w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex\">\n    <div class=\"h-48 sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden\" style=\"background-image: url('https://unsplash.it/804/800')\">\n    </div>\n    \n    <!-- card-content -->\n     <div class=\"px-6 py-4\">\n      <h2 class=\"mb-2 font-black\">Hello Tailwind!</h2>\n      <p class=\"mb-4 text-grey-dark text-sm\">\n        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.\n       </p>\n      \n       <!-- button -->\n      <button class=\"py-3 px-6 text-white font-bold rounded-full mt-1 mb-2\">\n        Hey, click me.\n       </button>\n       \n    </div>\n\n  </div>\n  \n</section>"
   ],
   "names": [],
   "mappings": "AAEI,MAAM,eAAC,CAAC,AACJ,gBAAgB,CAAE,OAAO,CACzB,gBAAgB,CAAE,gBAAgB,MAAM,CAAC,CAAC,OAAO,CAAC,EAAE,CAAC,CAAC,OAAO,CAAC,GAAG,CAAC,CAClE,UAAU,CAAE,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,OAAO,CAAC,CAAC,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,OAAO,AAC3D,CAAC,AACD,qBAAM,MAAM,AAAC,CAAC,AACV,UAAU,CAAE,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,CAAC,OAAO,CAAC,CAAC,MAAM,CAAC,MAAM,CAAC,IAAI,CAAC,OAAO,AAC3D,CAAC"

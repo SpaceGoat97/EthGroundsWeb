@@ -12,20 +12,142 @@
 </style>
 <!-- wrapper -->
 <section class="mb-2 font-sans leading-normal flex">
-  <!-- card container -->
-  <div class="w-full shadow-lg rounded overflow-hidden mx-12 my-2 sm:flex ">
-    <div class="h-full sm:h-auto sm:w-48 md:w-64 flex-none bg-cover bg-center rounded rounded-t sm:rounded sm:rounded-l text-center overflow-hidden" style="background-image: url('https://unsplash.it/804/800')">
-    </div>
-    <!-- card-content -->
-     <div class="px-6 py-20">
-      <h2 class="mb-2 font-black">Hello Tailwind!</h2>
-      <p class="mb-4 text-grey-dark text-sm">
-        
-        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
-        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
-        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
-        Learning Tailwind is incredibly easy. The team has done akjhk wonderful job with the documentation. This is pretty amazing, I must say.
-       </p>
-    </div>
-  </div>
+        <main class="w-full overflow-y-auto">
+        <div class="px-10 mt-5">
+          <span class="uppercase font-bold text-2xl text-white"
+            >special food</span
+          >
+        </div>
+        <div class="px-10 grid grid-cols-4 gap-4">
+          <div
+            class="col-span-4 sm:col-span-4 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col items-center"
+          >
+            <div class="bg-white rounded-lg mt-5">
+              <img
+                src="https://source.unsplash.com/MNtag_eXMKw/1600x900"
+                class="h-40 rounded-md"
+                alt=""
+              />
+            </div>
+            <div class="bg-white shadow-lg rounded-lg -mt-4 w-64">
+              <div class="py-5 px-5">
+                <span class="font-bold text-gray-800 text-lg">Geek Pizza</span>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-600 font-light">
+                    Size : Regular
+                  </div>
+                  <div class="text-2xl text-red-600 font-bold">
+                    $ 8.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end cols -->
+
+          <div
+            class="col-span-4 sm:col-span-4 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col items-center"
+          >
+            <div class="bg-white rounded-lg mt-5">
+              <img
+                src="https://source.unsplash.com/MNtag_eXMKw/1600x900"
+                class="h-40 rounded-md"
+                alt=""
+              />
+            </div>
+            <div class="bg-white shadow-lg rounded-lg -mt-4 w-64">
+              <div class="py-5 px-5">
+                <span class="font-bold text-gray-800 text-lg">Geek Pizza</span>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-600 font-light">
+                    Size : Regular
+                  </div>
+                  <div class="text-2xl text-red-600 font-bold">
+                    $ 8.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end cols -->
+
+          <div
+            class="col-span-4 sm:col-span-4 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col items-center"
+          >
+            <div class="bg-white rounded-lg mt-5">
+              <img
+                src="https://source.unsplash.com/MNtag_eXMKw/1600x900"
+                class="h-40 rounded-md"
+                alt=""
+              />
+            </div>
+            <div class="bg-white shadow-lg rounded-lg -mt-4 w-64">
+              <div class="py-5 px-5">
+                <span class="font-bold text-gray-800 text-lg">Geek Pizza</span>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-600 font-light">
+                    Size : Regular
+                  </div>
+                  <div class="text-2xl text-red-600 font-bold">
+                    $ 8.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end cols -->
+
+          <div
+            class="col-span-4 sm:col-span-4 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col items-center"
+          >
+            <div class="bg-white rounded-lg mt-5">
+              <img
+                src="https://source.unsplash.com/MNtag_eXMKw/1600x900"
+                class="h-40 rounded-md"
+                alt=""
+              />
+            </div>
+            <div class="bg-white shadow-lg rounded-lg -mt-4 w-64">
+              <div class="py-5 px-5">
+                <span class="font-bold text-gray-800 text-lg">Geek Pizza</span>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-600 font-light">
+                    Size : Regular
+                  </div>
+                  <div class="text-2xl text-red-600 font-bold">
+                    $ 8.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end cols -->
+
+          <div
+            class="col-span-4 sm:col-span-4 md:col-span-2 lg:col-span-1 xl:col-span-1 flex flex-col items-center"
+          >
+            <div class="bg-white rounded-lg mt-5">
+              <img
+                src="https://source.unsplash.com/MNtag_eXMKw/1600x900"
+                class="h-40 rounded-md"
+                alt=""
+              />
+            </div>
+            <div class="bg-white shadow-lg rounded-lg -mt-4 w-64">
+              <div class="py-5 px-5">
+                <span class="font-bold text-gray-800 text-lg">Geek Pizza</span>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-600 font-light">
+                    Size : Regular
+                  </div>
+                  <div class="text-2xl text-red-600 font-bold">
+                    $ 8.00
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end cols -->
+        </div>
+      </main>
 </section>
