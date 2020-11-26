@@ -1,2 +1,2 @@
-# EthGroundsX
+# EthGrounds
  
