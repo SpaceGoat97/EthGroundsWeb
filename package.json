@@ -28,6 +28,7 @@
   "dependencies": {
     "@beyonk/svelte-carousel": "^2.8.0",
     "firebase": "^8.0.2",
+    "gun": "^0.2020.520",
     "postcss": "^8.1.7",
     "rxfire": "^4.0.0",
     "rxjs": "^6.6.3",

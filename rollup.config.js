@@ -56,6 +56,11 @@ export default {
 			dedupe: ['svelte']
 		}),
 		commonjs(),
+		resolve({
+			browser: true,
+				dedupe: importee => importee === 'svelte' || importee.startsWith('svelte/'),
+			preferBuiltins: false
+		}),
 
 		// In dev mode, call `npm run start` once
 		// the bundle has been generated
