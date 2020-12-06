@@ -2,9 +2,15 @@
 import firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
+import svelte from 'rollup-plugin-svelte';
+import replace from '@rollup/plugin-replace';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 
 var firebaseConfig = {
-    apiKey: "AIzaSyDioqBXpSobn-B7trEp---AL7VYbDA5XpY",
+    apiKey: process.env.DB,
     authDomain: "ethgrounds.firebaseapp.com",
     databaseURL: "https://ethgrounds.firebaseio.com",
     projectId: "ethgrounds",
